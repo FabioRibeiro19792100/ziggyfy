@@ -273,12 +273,12 @@ a {
 }
 
 .session-card {
-  border: none;
-  padding: 0;
+  border: 1px solid var(--divider);
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: transparent;
+  background: rgba(24, 20, 16, 0.75);
   cursor: default;
   user-select: none;
 }
@@ -563,9 +563,9 @@ a {
   flex: 1;
   background: rgba(24, 20, 16, 0.9);
   border: 1px solid rgba(167, 137, 82, 0.35);
-  padding: 14px 18px;
+  padding: 10px 14px;
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: 0.02em;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
 }
@@ -579,6 +579,7 @@ a {
   color: var(--text);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  margin-left: auto;
 }
 
 .partner-filter {
@@ -844,8 +845,8 @@ a {
 
 .vinyl-hero {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) 1fr minmax(220px, 280px);
-  gap: 24px;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 32px;
   align-items: start;
 }
 
@@ -866,6 +867,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 20px;
 }
 
 .vinyl-buy-title {
@@ -894,7 +896,7 @@ a {
 .vinyl-details {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 24px;
+  gap: 16px;
 }
 
 .tracklist ol {
@@ -911,7 +913,7 @@ a {
 
 .tech-card {
   border: 1px solid var(--divider);
-  padding: 16px;
+  padding: 12px;
   background: rgba(22, 20, 16, 0.85);
   display: flex;
   flex-direction: column;
@@ -920,7 +922,7 @@ a {
 
 .related-card {
   border: 1px solid var(--divider);
-  padding: 16px;
+  padding: 12px;
   background: rgba(22, 20, 16, 0.85);
   display: flex;
   flex-direction: column;

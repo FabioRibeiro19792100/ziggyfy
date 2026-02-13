@@ -503,66 +503,66 @@ const VinylPage = ({ vinylId, member, onAddToCart }) => {
               {vinyl.year} · {vinyl.genre} · {vinyl.format}
             </div>
             {vinyl.description ? <div className="vinyl-description">{vinyl.description}</div> : null}
-          </div>
-          <div className="vinyl-buy">
-            <div className="vinyl-buy-title">Vendido por</div>
-            <div className="partner-list compact">
-              {items.map((item) => {
-                const partner = getPartnerById(item.partner_id);
-                const price = member ? item.price_member : item.price_normal;
-                return (
-                  <div key={`${item.partner_id}-${item.vinyl_id}`} className="partner-card compact">
-                    <div>
-                      <Link
-                        to={partnerCatalogLink(item.partner_id)}
-                        className="partner-name-link"
-                      >
-                        {partner?.name}
-                      </Link>
-                      <div className="partner-meta">
-                        Midia {item.condition_media} · Capa {item.condition_sleeve}
+            <div className="vinyl-buy">
+              <div className="vinyl-buy-title">Vendido por</div>
+              <div className="partner-list compact">
+                {items.map((item) => {
+                  const partner = getPartnerById(item.partner_id);
+                  const price = member ? item.price_member : item.price_normal;
+                  return (
+                    <div key={`${item.partner_id}-${item.vinyl_id}`} className="partner-card compact">
+                      <div>
+                        <Link
+                          to={partnerCatalogLink(item.partner_id)}
+                          className="partner-name-link"
+                        >
+                          {partner?.name}
+                        </Link>
+                        <div className="partner-meta">
+                          Midia {item.condition_media} · Capa {item.condition_sleeve}
+                        </div>
+                        <div className="partner-meta">
+                          {item.availability_status} · {item.quantity} un.
+                        </div>
                       </div>
-                      <div className="partner-meta">
-                        {item.availability_status} · {item.quantity} un.
+                      <div className="partner-price">
+                        <div className="partner-price-main">
+                          <div className="price-main">{formatPrice(price)}</div>
+                          {member ? (
+                            <div className="price-meta">Condicao exclusiva Ziggyfy</div>
+                          ) : (
+                            <div className="price-meta">Preco normal</div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label="Adicionar ao carrinho"
+                          onClick={() =>
+                            onAddToCart?.({
+                              vinylId: vinyl.id,
+                              partnerId: item.partner_id,
+                            })
+                          }
+                        >
+                          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                            <path
+                              d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle cx="9" cy="20" r="1.3" fill="currentColor" />
+                            <circle cx="17" cy="20" r="1.3" fill="currentColor" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <div className="partner-price">
-                      <div className="partner-price-main">
-                        <div className="price-main">{formatPrice(price)}</div>
-                        {member ? (
-                          <div className="price-meta">Condicao exclusiva Ziggyfy</div>
-                        ) : (
-                          <div className="price-meta">Preco normal</div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label="Adicionar ao carrinho"
-                        onClick={() =>
-                          onAddToCart?.({
-                            vinylId: vinyl.id,
-                            partnerId: item.partner_id,
-                          })
-                        }
-                      >
-                        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-                          <path
-                            d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <circle cx="9" cy="20" r="1.3" fill="currentColor" />
-                          <circle cx="17" cy="20" r="1.3" fill="currentColor" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
