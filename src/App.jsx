@@ -86,11 +86,7 @@ const NonMemberPrice = ({ value, onActivate }) => (
 );
 
 const useMember = () => {
-  const [member, setMember] = useState(() =>
-    typeof window === "undefined"
-      ? false
-      : window.localStorage.getItem("ziggy_member") === "1"
-  );
+  const [member, setMember] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1484,8 +1480,9 @@ const ClubePage = () => (
         <article className="club-plan-card premium">
           <div className="club-tier">Ziggy Stardust</div>
           <p>
-            Tudo do Ziggy Free, mais descontos especiais na compra de vinis com parceiros e
-            prioridade na participação de sessões especiais com convidados.
+            Tudo do Ziggy Free, mais condição especial na compra dos discos vinculados à
+            programação, acesso prioritário a sessões especiais com convidados e participação no
+            Clube de Troca de Vinis.
           </p>
           <div className="club-actions">
             <button type="button" className="primary-button">
