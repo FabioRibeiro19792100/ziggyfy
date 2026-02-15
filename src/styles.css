@@ -950,6 +950,9 @@ a {
   text-decoration: none;
   min-width: 180px;
   min-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3044,6 +3047,34 @@ a {
     flex-shrink: 0;
   }
 
+  .primary-button,
+  .ghost-button,
+  .reserve-button,
+  .session-buy-link,
+  .section-link,
+  .primary-link,
+  .pack-cart-button,
+  .filter-chip {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    min-height: 44px;
+  }
+
+  .session-buy-link,
+  .reserve-button {
+    border: 1px solid rgba(167, 137, 82, 0.55);
+    border-radius: 999px;
+    padding: 0 12px;
+    justify-content: center;
+    color: var(--text);
+    background: rgba(167, 137, 82, 0.12);
+  }
+
+  .primary-link {
+    border-bottom-width: 2px;
+  }
+
   .search-row input {
     font-size: 16px;
   }
@@ -3195,6 +3226,20 @@ a {
     width: 50%;
     min-width: 0;
     justify-content: center;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .reserve-button,
+  .session-buy-link,
+  .section-link,
+  .primary-link,
+  .pack-cart-button,
+  .filter-chip {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    min-height: 42px;
   }
 
   .vinyl-album {
