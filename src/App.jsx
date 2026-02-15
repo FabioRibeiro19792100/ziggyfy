@@ -19,6 +19,144 @@ const formatPrice = (value) =>
   }).format(value);
 
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
+const COVER_CACHE_KEY = "ziggy_real_cover_cache_v2";
+
+const normalizeCoverText = (value = "") =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const getPrimaryArtist = (artist = "") =>
+  artist
+    .split(/[\/,&]/)[0]
+    .replace(/\bvarios\b/gi, "")
+    .trim();
+
+const normalizeAlbumForMatch = (value = "") =>
+  normalizeCoverText(value).replace(
+    /\b(deluxe|edition|remaster|remastered|version|soundtrack|live)\b/g,
+    ""
+  ).trim();
+
+const getArtworkFromItunesResult = (result) => {
+  const raw = result?.artworkUrl100 || result?.artworkUrl60 || result?.artworkUrl30;
+  if (!raw) return null;
+  return raw.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+};
+
+const isGeneratedCover = (url = "") => url.startsWith("data:image/svg+xml");
+
+const rankItunesResult = (result, artist, album) => {
+  const artistNorm = normalizeCoverText(getPrimaryArtist(artist));
+  const albumNorm = normalizeAlbumForMatch(album);
+  const resultArtist = normalizeCoverText(result?.artistName || "");
+  const resultAlbum = normalizeAlbumForMatch(result?.collectionName || "");
+  let score = 0;
+
+  if (albumNorm && (resultAlbum.includes(albumNorm) || albumNorm.includes(resultAlbum))) score += 6;
+  if (artistNorm && (resultArtist.includes(artistNorm) || artistNorm.includes(resultArtist))) score += 4;
+  if (result?.collectionType === "Album") score += 1;
+  return score;
+};
+
+const isTrustedItunesMatch = (result, artist, album) => {
+  const artistNorm = normalizeCoverText(getPrimaryArtist(artist));
+  const albumNorm = normalizeAlbumForMatch(album);
+  const resultArtist = normalizeCoverText(result?.artistName || "");
+  const resultAlbum = normalizeAlbumForMatch(result?.collectionName || "");
+  const score = rankItunesResult(result, artist, album);
+
+  const albumMatches =
+    albumNorm && resultAlbum && (resultAlbum.includes(albumNorm) || albumNorm.includes(resultAlbum));
+  const artistMatches =
+    artistNorm && resultArtist && (resultArtist.includes(artistNorm) || artistNorm.includes(resultArtist));
+
+  return score >= 8 && albumMatches && artistMatches;
+};
+
+const useRealCoverResolver = () => {
+  const [coverMap, setCoverMap] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem(COVER_CACHE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(coverMap));
+  }, [coverMap]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const missing = vinyls.filter((vinyl) => coverMap[vinyl.id] === undefined);
+    if (!missing.length) return () => {};
+
+    const fetchCovers = async () => {
+      for (const vinyl of missing) {
+        if (cancelled) break;
+        try {
+          const term = encodeURIComponent(`${getPrimaryArtist(vinyl.artist)} ${vinyl.album}`);
+          const response = await fetch(
+            `https://itunes.apple.com/search?media=music&entity=album&limit=8&term=${term}`
+          );
+          if (!response.ok) {
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            continue;
+          }
+          const payload = await response.json();
+          const results = Array.isArray(payload?.results) ? payload.results : [];
+          if (!results.length) {
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            continue;
+          }
+
+          const best = [...results].sort(
+            (a, b) => rankItunesResult(b, vinyl.artist, vinyl.album) - rankItunesResult(a, vinyl.artist, vinyl.album)
+          )[0];
+          if (!best || !isTrustedItunesMatch(best, vinyl.artist, vinyl.album)) {
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            continue;
+          }
+          const coverUrl = getArtworkFromItunesResult(best);
+          if (!coverUrl || cancelled) {
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            continue;
+          }
+
+          setCoverMap((prev) => {
+            if (prev[vinyl.id] === coverUrl) return prev;
+            return { ...prev, [vinyl.id]: coverUrl };
+          });
+        } catch {
+          setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+        }
+      }
+    };
+
+    fetchCovers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [coverMap]);
+
+  return (vinyl) => {
+    const cached = coverMap[vinyl.id];
+    if (cached) return cached;
+    if (cached === null) return "";
+    if (vinyl.cover_image_url && !isGeneratedCover(vinyl.cover_image_url)) return vinyl.cover_image_url;
+    return "";
+  };
+};
 
 const PricePrivacyEye = ({ onActivate }) => (
   <span
@@ -230,7 +368,7 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
         O clube
       </Link>
       <Link to="/menu" className="nav-link">
-        A cozinha
+        O balcão
       </Link>
       <Link to="/market?catalog=1" className="nav-link">
         A loja
@@ -239,7 +377,7 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
   </header>
 );
 
-const SessionCard = ({ session, onReserve }) => {
+const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
   const covers = getSessionVinyls(session.id, "tocado").slice(0, 4);
   return (
     <div
@@ -260,7 +398,7 @@ const SessionCard = ({ session, onReserve }) => {
           <div
             key={vinyl.id}
             className="session-cover"
-            style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+            style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
           />
         ))}
       </div>
@@ -281,7 +419,7 @@ const SessionCard = ({ session, onReserve }) => {
 };
 
 
-const SalaPage = ({ onReserve }) => {
+const SalaPage = ({ onReserve, resolveCoverUrl }) => {
   const today = new Date();
   const upcoming = [...sessions]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -296,6 +434,32 @@ const SalaPage = ({ onReserve }) => {
           aria-label="Sala de audição"
           style={{ backgroundImage: `url(${capaHero4}?v=2)` }}
         />
+        <a
+          className="sala-hero-address sala-hero-address-top"
+          href="https://www.google.com/maps/search/?api=1&query=Avenida%20S%C3%A3o%20Luiz%2C%20222%2C%20conjunto%2018%2C%20S%C3%A3o%20Paulo"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Abrir no mapa"
+          aria-label="Abrir no mapa: Avenida São Luiz, 222, conjunto 18"
+        >
+          <span className="sala-hero-address-text">
+            <span className="sala-hero-address-line">Avenida São Luiz, 222</span>
+            <span className="sala-hero-address-line">Conjunto 18</span>
+            <span className="sala-hero-address-line">Centro-SP</span>
+          </span>
+          <span className="sala-hero-address-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <path
+                d="M8 16 16 8M10 8h6v6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </a>
         <div className="sala-hero-copy">
           <div className="menu-hero-kicker sala-hero-kicker">A SALA</div>
           <p className="sala-hero-title">
@@ -315,7 +479,7 @@ const SalaPage = ({ onReserve }) => {
         </div>
         <div className="session-grid">
           {sessions.map((session) => (
-            <SessionCard key={session.id} session={session} onReserve={onReserve} />
+            <SessionCard key={session.id} session={session} onReserve={onReserve} resolveCoverUrl={resolveCoverUrl} />
           ))}
         </div>
       </section>
@@ -332,7 +496,7 @@ const SalaPage = ({ onReserve }) => {
   );
 };
 
-const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActivateMember }) => {
+const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActivateMember, resolveCoverUrl }) => {
   const best = inventoryItem || getBestInventory(vinyl.id);
   const partner = best ? getPartnerById(best.partner_id) : null;
   const normalPrice = best ? best.price_normal : null;
@@ -340,7 +504,7 @@ const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActi
 
   return (
     <Link to={`/vinyl/${vinyl.id}`} className="vinyl-card">
-      <div className="vinyl-cover" style={{ backgroundImage: `url(${vinyl.cover_image_url})` }} />
+      <div className="vinyl-cover" style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }} />
       <div className="vinyl-info">
         <div className="vinyl-artist">{vinyl.artist}</div>
         <div className="vinyl-album">{vinyl.album}</div>
@@ -408,7 +572,7 @@ const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActi
   );
 };
 
-const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onActivateMember }) => {
+const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onActivateMember, resolveCoverUrl }) => {
   const today = new Date();
   const movementParam = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -492,28 +656,8 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
   const movementDisplay = useMemo(() => {
     if (!movementLabel) return [];
     const exact = vinyls.filter((vinyl) => vinyl.tags?.includes(movementLabel));
-    const ids = new Set(exact.map((item) => item.id));
-    const list = [...exact];
-
-    if (list.length < 4) {
-      movementBase.forEach((vinyl) => {
-        if (list.length >= 4) return;
-        if (ids.has(vinyl.id)) return;
-        ids.add(vinyl.id);
-        list.push(vinyl);
-      });
-    }
-
-    if (list.length < 4) {
-      vinyls.forEach((vinyl) => {
-        if (list.length >= 4) return;
-        if (ids.has(vinyl.id)) return;
-        ids.add(vinyl.id);
-        list.push(vinyl);
-      });
-    }
-
-    return list.slice(0, 4);
+    if (exact.length) return exact.slice(0, 4);
+    return movementBase.slice(0, 4);
   }, [movementLabel, movementBase]);
   const movementPackage = useMemo(() => {
     if (!movementDisplay.length) return null;
@@ -549,7 +693,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
           </div>
           <div className="session-grid">
             {sessions.map((session) => (
-              <SessionCard key={session.id} session={session} onReserve={onReserve} />
+              <SessionCard key={session.id} session={session} onReserve={onReserve} resolveCoverUrl={resolveCoverUrl} />
             ))}
           </div>
           <Link to="/market?catalog=1" className="section-link">
@@ -570,7 +714,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
               <div key={vinyl.id} className="highlight-item">
                 <div
                   className="highlight-cover"
-                  style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                  style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
                 />
                 <div className="highlight-info">
                   <div className="vinyl-artist">{vinyl.artist}</div>
@@ -720,6 +864,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
               member={member}
               onAddToCart={onAddToCart}
               onActivateMember={onActivateMember}
+              resolveCoverUrl={resolveCoverUrl}
             />
           ))}
         </div>
@@ -728,7 +873,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
   );
 };
 
-const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
+const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolveCoverUrl }) => {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) {
     return (
@@ -771,22 +916,9 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
   const movementGroups = movementTags.map((tag) => {
     const primary = vinyls.filter((vinyl) => vinyl.tags?.includes(tag));
     const nonPlayed = primary.filter((vinyl) => !played.some((item) => item.id === vinyl.id));
-    const base = nonPlayed.length ? nonPlayed : primary;
-    const ids = new Set(base.map((item) => item.id));
-    const items = [...base];
-
-    if (items.length < 4) {
-      vinyls.forEach((vinyl) => {
-        if (items.length >= 4) return;
-        if (ids.has(vinyl.id)) return;
-        if (played.some((item) => item.id === vinyl.id)) return;
-        ids.add(vinyl.id);
-        items.push(vinyl);
-      });
-    }
-
+    const items = (nonPlayed.length ? nonPlayed : primary).slice(0, 4);
     return { tag, items };
-  });
+  }).filter((group) => group.items.length > 0);
 
   return (
     <main className="page">
@@ -818,7 +950,7 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
                 <Link to={`/vinyl/${vinyl.id}`}>
                   <div
                     className="played-cover"
-                    style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                    style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
                   />
                 </Link>
                 <div className="played-info">
@@ -900,6 +1032,7 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
               member={member}
               onAddToCart={onAddToCart}
               onActivateMember={onActivateMember}
+              resolveCoverUrl={resolveCoverUrl}
             />
           ))}
         </div>
@@ -921,7 +1054,7 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
                     <Link key={vinyl.id} to={`/vinyl/${vinyl.id}`} className="movement-cover">
                       <div
                         className="movement-cover-image"
-                        style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                        style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
                         aria-label={`${vinyl.artist} ${vinyl.album}`}
                       />
                     </Link>
@@ -952,7 +1085,7 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
   );
 };
 
-const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember }) => {
+const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember, resolveCoverUrl }) => {
   const vinyl = getVinylById(vinylId);
   if (!vinyl) {
     return (
@@ -978,7 +1111,7 @@ const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember }) => {
         <div className="vinyl-hero">
           <div
             className="vinyl-hero-cover"
-            style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+            style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
           />
           <div className="vinyl-hero-info">
             <div className="vinyl-artist">{vinyl.artist}</div>
@@ -1107,7 +1240,7 @@ const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember }) => {
             <div className="related-list">
               {related.map((item) => (
                 <Link key={item.id} to={`/vinyl/${item.id}`} className="related-item">
-                  <img src={item.cover_image_url} alt={`${item.artist} ${item.album}`} />
+                  <img src={resolveCoverUrl(item)} alt={`${item.artist} ${item.album}`} />
                   <div>
                     <div className="vinyl-artist">{item.artist}</div>
                     <div className="vinyl-album">{item.album}</div>
@@ -1192,7 +1325,7 @@ const PartnersPage = () => {
   );
 };
 
-const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember }) => {
+const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember, resolveCoverUrl }) => {
   const partner = getPartnerById(partnerId);
   const partnerItems = inventory.filter((item) => item.partner_id === partnerId);
   const partnerVinyls = partnerItems
@@ -1234,6 +1367,7 @@ const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember }) => {
               onAddToCart={onAddToCart}
               inventoryItem={item.inventory}
               onActivateMember={onActivateMember}
+              resolveCoverUrl={resolveCoverUrl}
             />
           ))}
         </div>
@@ -1253,7 +1387,7 @@ const MenuPage = () => (
           <img src={imagemCardapio2} alt="" loading="eager" decoding="async" />
         </div>
         <div className="club-hero-copy">
-          <div className="menu-hero-kicker">A COZINHA</div>
+          <div className="menu-hero-kicker">O BALCÃO</div>
           <h1>
             We can be foodies <span className="club-title-line">just for one day</span>
           </h1>
@@ -1462,33 +1596,30 @@ const ClubePage = () => (
       <div className="club-plan-grid">
         <article className="club-plan-card">
           <div className="club-tier">Ziggy Free</div>
-          <p>
-            Participa da comunidade, tem acesso ao marketplace de vinis e recebe a programação com
-            antecedência.
-          </p>
+          <ul className="club-plan-points">
+            <li>Acesso ao marketplace de vinis.</li>
+            <li>Programação da sala com antecedência.</li>
+            <li>Entrada na comunidade Ziggy.</li>
+          </ul>
           <div className="club-actions">
-            <a
-              className="primary-button"
-              href="https://wa.me/5500000000000"
-              target="_blank"
-              rel="noreferrer"
-            >
+            <Link className="primary-button" to="/clube/adesao/free">
               Entrar no Ziggy Free
-            </a>
+            </Link>
           </div>
         </article>
         <article className="club-plan-card premium">
           <div className="club-tier">Ziggy Stardust</div>
-          <p>
-            Tudo do Ziggy Free, mais condição especial na compra dos discos vinculados à
-            programação, acesso prioritário a sessões especiais com convidados e participação no
-            Clube de Troca de Vinis.
-          </p>
+          <ul className="club-plan-points">
+            <li>Tudo do Ziggy Free.</li>
+            <li>Condição especial na compra de discos da programação.</li>
+            <li>Acesso prioritário a sessões especiais com convidados.</li>
+            <li>Participação no Clube de Troca de Vinis.</li>
+          </ul>
           <div className="club-actions">
-            <button type="button" className="primary-button">
+            <Link to="/clube/adesao/stardust" className="primary-button">
               Assinar Ziggy Stardust
               <span className="club-price-in-cta"> - R$ 49 / mes</span>
-            </button>
+            </Link>
             <div className="club-price-inline">R$ 49 / mes</div>
           </div>
         </article>
@@ -1496,6 +1627,165 @@ const ClubePage = () => (
     </section>
   </main>
 );
+
+const ClubePlanResultPage = ({ plan, onActivateMember }) => {
+  const isPremium = plan === "stardust";
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [freeSubmitted, setFreeSubmitted] = useState(false);
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
+  const [signupCpf, setSignupCpf] = useState("");
+
+  const whatsappEntryUrl = `https://wa.me/5500000000000?text=${encodeURIComponent(
+    `Oi! Quero entrar no grupo do Ziggy Free.\n\nNome: ${signupName}\nEmail: ${signupEmail}\nTelefone: ${signupPhone}${signupCpf ? `\nCPF: ${signupCpf}` : ""}`
+  )}`;
+
+  const handleSignupSubmit = (event) => {
+    event.preventDefault();
+    if (isPremium) {
+      setPaymentOpen(true);
+      return;
+    }
+    window.open(whatsappEntryUrl, "_blank", "noopener,noreferrer");
+    setFreeSubmitted(true);
+  };
+
+  return (
+    <main className="page clube-page">
+      <section className="section">
+        <div className="section-header">
+          <p className="club-signup-intro">
+            {isPremium
+              ? "Complete seu cadastro básico para abrir a janela de pagamento."
+              : "Complete seu cadastro básico para entrar no grupo de WhatsApp do Ziggy Free."}
+          </p>
+        </div>
+
+        <article className={`club-card club-signup-card ${isPremium ? "premium" : ""}`}>
+          <div className="club-signup-summary">
+            <div className="club-tier">{isPremium ? "Ziggy Stardust" : "Ziggy Free"}</div>
+            <div className="club-price">{isPremium ? "R$ 49 / mes" : "Sem mensalidade"}</div>
+            <ul className="club-list">
+              <li>Acesso ao marketplace contextual de vinis.</li>
+              {isPremium ? (
+                <li>Desconto de membro na vitrine conectada às sessões.</li>
+              ) : (
+                <li>Programação da sala com antecedência e reservas.</li>
+              )}
+              {isPremium ? (
+                <li>Prioridade em sessões especiais e clube de troca.</li>
+              ) : (
+                <li>Upgrade para o premium a qualquer momento.</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="club-signup-main">
+            <div className="club-signup-divider">Seus dados</div>
+            <form className="club-signup-form" onSubmit={handleSignupSubmit}>
+              <label>
+                Nome completo
+                <input
+                  required
+                  type="text"
+                  name="name"
+                  value={signupName}
+                  onChange={(event) => setSignupName(event.target.value)}
+                  placeholder="Seu nome"
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  required
+                  type="email"
+                  name="email"
+                  value={signupEmail}
+                  onChange={(event) => setSignupEmail(event.target.value)}
+                  placeholder="voce@email.com"
+                />
+              </label>
+              <label>
+                Telefone
+                <input
+                  required
+                  type="tel"
+                  name="phone"
+                  value={signupPhone}
+                  onChange={(event) => setSignupPhone(event.target.value)}
+                  placeholder="(11) 99999-0000"
+                />
+              </label>
+              <label>
+                CPF (opcional)
+                <input
+                  type="text"
+                  name="cpf"
+                  value={signupCpf}
+                  onChange={(event) => setSignupCpf(event.target.value)}
+                  placeholder="000.000.000-00"
+                />
+              </label>
+
+              <div className="club-signup-cta-row">
+                <button type="submit" className="primary-button">
+                  {isPremium ? "Continuar para pagamento" : "Entrar no grupo do WhatsApp"}
+                </button>
+                <Link to="/clube" className="club-back-link">
+                  Ou voltar para planos
+                </Link>
+              </div>
+            </form>
+
+            {freeSubmitted && !isPremium ? (
+              <div className="club-signup-note">
+                Cadastro enviado. O grupo de WhatsApp foi aberto em uma nova aba.
+              </div>
+            ) : null}
+          </div>
+        </article>
+      </section>
+
+      {paymentOpen ? (
+        <div className="modal-overlay" onClick={() => setPaymentOpen(false)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Pagamento Ziggy Stardust</div>
+                <div className="modal-subtitle">R$ 49 / mes · {signupName || "Assinante"}</div>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setPaymentOpen(false)}>
+                Fechar
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="modal-note">Janela de pagamento simulada para assinatura mensal.</div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    onActivateMember?.();
+                    setPaymentOpen(false);
+                    window.history.pushState({}, "", "/market?catalog=1");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                    window.scrollTo(0, 0);
+                  }}
+                >
+                  Pagar R$ 49 e ativar assinatura
+                </button>
+                <button type="button" className="ghost-button" onClick={() => setPaymentOpen(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </main>
+  );
+};
 
 const App = () => {
   const [member, setMember] = useMember();
@@ -1506,6 +1796,7 @@ const App = () => {
   const [reserveSuccess, setReserveSuccess] = useState(false);
   const [confirmItem, setConfirmItem] = useState(null);
   const { path } = usePath();
+  const resolveCoverUrl = useRealCoverResolver();
   const requestAddToCart = (input) => {
     if (!input) return;
     if (input.vinylId && input.partnerId) {
@@ -1529,6 +1820,8 @@ const App = () => {
     if (cleanPath.startsWith("/partner/"))
       return { name: "partner", id: cleanPath.replace("/partner/", "") };
     if (cleanPath === "/clube") return { name: "clube" };
+    if (cleanPath === "/clube/adesao/free") return { name: "clube-result", plan: "free" };
+    if (cleanPath === "/clube/adesao/stardust") return { name: "clube-result", plan: "stardust" };
     if (cleanPath === "/market") return { name: "market" };
     if (cleanPath === "/menu") return { name: "menu" };
     if (cleanPath === "/partners") return { name: "partners" };
@@ -1678,7 +1971,7 @@ const App = () => {
                   <div key={`${item.vinylId}-${item.partnerId}`} className="cart-item">
                     <div
                       className="cart-cover"
-                      style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                      style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
                     />
                     <div className="cart-info">
                       <div className="vinyl-artist">{vinyl.artist}</div>
@@ -1748,6 +2041,7 @@ const App = () => {
       ) : null}
       {route.name === "sala" && (
         <SalaPage
+          resolveCoverUrl={resolveCoverUrl}
           onReserve={(session) => {
             setReserveSession(session);
             setReserveSuccess(false);
@@ -1759,6 +2053,7 @@ const App = () => {
         <MarketplacePage
           member={member}
           onActivateMember={() => setMember(true)}
+          resolveCoverUrl={resolveCoverUrl}
           onAddToCart={requestAddToCart}
           onAddPackToCart={(packItems) => {
             if (!packItems?.length) return;
@@ -1782,6 +2077,7 @@ const App = () => {
           member={member}
           onAddToCart={requestAddToCart}
           onActivateMember={() => setMember(true)}
+          resolveCoverUrl={resolveCoverUrl}
         />
       )}
       {route.name === "vinyl" && (
@@ -1790,6 +2086,7 @@ const App = () => {
           member={member}
           onAddToCart={requestAddToCart}
           onActivateMember={() => setMember(true)}
+          resolveCoverUrl={resolveCoverUrl}
         />
       )}
       {route.name === "partner" && (
@@ -1798,9 +2095,16 @@ const App = () => {
           onAddToCart={requestAddToCart}
           member={member}
           onActivateMember={() => setMember(true)}
+          resolveCoverUrl={resolveCoverUrl}
         />
       )}
       {route.name === "clube" && <ClubePage />}
+      {route.name === "clube-result" && (
+        <ClubePlanResultPage
+          plan={route.plan}
+          onActivateMember={() => setMember(true)}
+        />
+      )}
       {route.name === "menu" && <MenuPage />}
       {route.name === "partners" && <PartnersPage />}
       {route.name === "notfound" && (
@@ -1816,7 +2120,7 @@ const App = () => {
       <footer className="footer">
         <div className="footer-main">
           <div className="footer-brand">Ziggy Play</div>
-          <div className="footer-address">Endereco Av Sao Luiz 222, Centro de SP</div>
+          <div className="footer-address">Avenida São Luiz, 222, conjunto 18, Centro, São Paulo/SP</div>
         </div>
         <div className="footer-quote">we are absolute beginners</div>
       </footer>
