@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { inventory, partners, sessions, sessionVinyl, vinyls } from "./data.js";
+import imagemCardapio2 from "../Cardapio2.jpg";
+import capaHero from "../capahero.webp";
+import capaHero4 from "../capa4.webp";
 
 const formatDate = (iso) =>
   new Intl.DateTimeFormat("pt-BR", {
@@ -14,6 +17,73 @@ const formatPrice = (value) =>
     currency: "BRL",
     maximumFractionDigits: 0,
   }).format(value);
+
+const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
+
+const PricePrivacyEye = ({ onActivate }) => (
+  <span
+    className="price-eye-button"
+    role="button"
+    tabIndex={0}
+    aria-label="Ativar modo membro premium"
+    title="Ativar modo membro premium"
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onActivate?.();
+    }}
+    onMouseDown={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    }}
+    onTouchStart={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onActivate?.();
+    }}
+    onKeyDown={(event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
+        onActivate?.();
+      }
+    }}
+  >
+    <span className="price-eye" aria-hidden="true">
+    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+      <path
+        d="M2.8 12c1.9-3.2 5.1-5 9.2-5s7.3 1.8 9.2 5c-1.9 3.2-5.1 5-9.2 5s-7.3-1.8-9.2-5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M4 20 20 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+    </span>
+  </span>
+);
+
+const NonMemberPrice = ({ value, onActivate }) => (
+  <div
+    className="price-main with-eye"
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onActivate?.();
+    }}
+    onTouchStart={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onActivate?.();
+    }}
+  >
+    <span>{value}</span>
+    <PricePrivacyEye onActivate={onActivate} />
+  </div>
+);
 
 const useMember = () => {
   const [member, setMember] = useState(() =>
@@ -83,6 +153,27 @@ const Link = ({ to, children, className }) => (
       event.preventDefault();
       window.history.pushState({}, "", to);
       window.dispatchEvent(new PopStateEvent("popstate"));
+      const hash = to.includes("#") ? to.split("#")[1] : "";
+      if (hash) {
+        const scrollToHash = (attempt = 0) => {
+          const target = document.getElementById(hash);
+          if (target) {
+            const nav = document.querySelector(".top-nav");
+            const navHeight = nav ? nav.getBoundingClientRect().height : 0;
+            const top = target.getBoundingClientRect().top + window.scrollY - navHeight;
+            window.scrollTo({ top, behavior: "smooth" });
+            return;
+          }
+          if (attempt < 30) {
+            requestAnimationFrame(() => scrollToHash(attempt + 1));
+            return;
+          }
+          window.scrollTo(0, 0);
+        };
+        requestAnimationFrame(() => scrollToHash(0));
+      } else {
+        window.scrollTo(0, 0);
+      }
     }}
   >
     {children}
@@ -116,35 +207,38 @@ const isVinylInSession = (sessionId, vinylId) =>
 const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
   <header className="top-nav">
     <Link to="/" className="brand">
-      <div className="brand-mark">Ziggyfy</div>
-      <div className="brand-sub">O Marketplace de vinis do Ziggy Play</div>
+      <div className="brand-mark">Ziggy Play</div>
+      <div className="brand-sub">Um lugar que toca música</div>
     </Link>
-    <nav className="nav-links">
+    <div className="top-nav-actions">
       <button
         type="button"
-        className={`member-toggle ${member ? "is-active" : ""}`}
+        className={`member-toggle member-toggle-icon ${member ? "is-active" : ""}`}
         onClick={() => setMember((prev) => !prev)}
+        aria-label={member ? "Membro ativo" : "Entrar como membro"}
+        title={member ? "Membro ativo" : "Entrar como membro"}
       >
-        {member ? "Membro ativo" : "Entrar como membro"}
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <path
+            d="M12 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.6-6 3.6V20h12v-1.9c0-2-2.7-3.6-6-3.6Z"
+            fill="currentColor"
+          />
+        </svg>
       </button>
-      <button type="button" className="cart-button" onClick={onToggleCart} aria-label="Carrinho">
-        <span className="cart-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <path
-              d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <circle cx="9" cy="20" r="1.3" fill="currentColor" />
-            <circle cx="17" cy="20" r="1.3" fill="currentColor" />
-          </svg>
-        </span>
-        <span className="cart-label">Carrinho</span>
-        {cartCount ? <span className="cart-count">{cartCount}</span> : null}
-      </button>
+    </div>
+    <nav className="nav-links">
+      <Link to="/" className="nav-link">
+        A sala
+      </Link>
+      <Link to="/clube" className="nav-link">
+        O clube
+      </Link>
+      <Link to="/menu" className="nav-link">
+        A cozinha
+      </Link>
+      <Link to="/market?catalog=1" className="nav-link">
+        A loja
+      </Link>
     </nav>
   </header>
 );
@@ -190,25 +284,145 @@ const SessionCard = ({ session, onReserve }) => {
   );
 };
 
-const VinylCard = ({ vinyl, subtitle }) => (
-  <Link to={`/vinyl/${vinyl.id}`} className="vinyl-card">
-    <div className="vinyl-cover" style={{ backgroundImage: `url(${vinyl.cover_image_url})` }} />
-    <div className="vinyl-info">
-      <div className="vinyl-artist">{vinyl.artist}</div>
-      <div className="vinyl-album">{vinyl.album}</div>
-      {subtitle ? <div className="vinyl-subtitle">{subtitle}</div> : null}
-    </div>
-  </Link>
-);
 
-const Home = ({ member, onReserve }) => {
+const SalaPage = ({ onReserve }) => {
   const today = new Date();
-  useEffect(() => {
+  const upcoming = [...sessions]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .filter((session) => new Date(session.date) >= new Date(today.toDateString()));
+  const nextSession = upcoming[0] || sessions[0];
+
+  return (
+    <main className="page">
+      <section className="section sala-hero">
+        <div
+          className="sala-hero-image"
+          aria-label="Sala de audição"
+          style={{ backgroundImage: `url(${capaHero4}?v=2)` }}
+        />
+        <div className="sala-hero-copy">
+          <div className="menu-hero-kicker sala-hero-kicker">A SALA</div>
+          <p>Um lugar onde a música é redonda e plana</p>
+        </div>
+      </section>
+
+      <section className="section" id="programacao-semana">
+        <div className="section-header">
+          <h2>Programação da semana</h2>
+        </div>
+        <div className="session-grid">
+          {sessions.map((session) => (
+            <SessionCard key={session.id} session={session} onReserve={onReserve} />
+          ))}
+        </div>
+      </section>
+
+      <section className="section" id="clube">
+        <div className="section-header">
+          <h2>Clube de membros</h2>
+          <p>Participação contínua com plano Free e Premium.</p>
+        </div>
+        <Link to="/clube" className="primary-link">Ver níveis do clube</Link>
+      </section>
+
+    </main>
+  );
+};
+
+const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActivateMember }) => {
+  const best = inventoryItem || getBestInventory(vinyl.id);
+  const partner = best ? getPartnerById(best.partner_id) : null;
+  const normalPrice = best ? best.price_normal : null;
+  const price = normalPrice !== null ? (member ? discountedPrice(normalPrice) : normalPrice) : null;
+
+  return (
+    <Link to={`/vinyl/${vinyl.id}`} className="vinyl-card">
+      <div className="vinyl-cover" style={{ backgroundImage: `url(${vinyl.cover_image_url})` }} />
+      <div className="vinyl-info">
+        <div className="vinyl-artist">{vinyl.artist}</div>
+        <div className="vinyl-album">{vinyl.album}</div>
+        {subtitle ? <div className="vinyl-subtitle">{subtitle}</div> : null}
+        {best && partner && price ? (
+          <div className="price-row">
+            {member ? (
+              <div className="price-main price-compare">
+                <span className="price-old">{formatPrice(normalPrice)}</span>
+                <span className="price-new">{formatPrice(price)}</span>
+              </div>
+            ) : (
+              <NonMemberPrice value={formatPrice(price)} onActivate={onActivateMember} />
+            )}
+            <div className="price-meta">
+              {member ? "15% OFF Membro Premium" : "Preço normal"}
+            </div>
+            <div className="price-partner-row">
+              <button
+                type="button"
+                className="price-partner-link as-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const to = partnerCatalogLink(partner.id);
+                  window.history.pushState({}, "", to);
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                }}
+              >
+                {partner.name}
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Adicionar ao carrinho"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onAddToCart?.({
+                    vinylId: vinyl.id,
+                    partnerId: best.partner_id,
+                  });
+                }}
+              >
+                <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <path
+                    d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="9" cy="20" r="1.3" fill="currentColor" />
+                  <circle cx="17" cy="20" r="1.3" fill="currentColor" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="vinyl-subtitle">Sem parceiro disponível</div>
+        )}
+      </div>
+    </Link>
+  );
+};
+
+const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onActivateMember }) => {
+  const today = new Date();
+  const movementParam = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("catalog")) {
-      const section = document.getElementById("catalog");
-      section?.scrollIntoView({ behavior: "smooth" });
-    }
+    return params.get("movement") || "";
+  }, []);
+  const movementLabel = movementParam.trim();
+  const movementDescriptions = {
+    "Soul de quarto escuro":
+      "Texturas densas, vozes próximas e camadas que pedem escuta focada em volume controlado.",
+    "Baladas com arranjo orquestral":
+      "Faixas de pulso lento com harmonias amplas e clima cinematografico para audição prolongada.",
+    "Groove lento e urbano":
+      "Baixos marcados, batida redonda e repeticao hipnotica para construcoes de atmosfera.",
+  };
+  const catalogOnly = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("catalog") === "1";
   }, []);
   const upcomingSessions = [...sessions]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -228,11 +442,92 @@ const Home = ({ member, onReserve }) => {
     return picks.length ? picks : vinyls.slice(0, 4);
   }, [upcomingSessions]);
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(movementParam);
+  const [catalogFilter, setCatalogFilter] = useState("all");
+  const discountVinylIds = useMemo(
+    () =>
+      new Set(
+        inventory
+          .filter((item) => item.price_member < item.price_normal)
+          .map((item) => item.vinyl_id)
+      ),
+    []
+  );
+  const rarityVinylIds = useMemo(
+    () => new Set(inventory.filter((item) => item.quantity <= 1).map((item) => item.vinyl_id)),
+    []
+  );
   const filtered = vinyls.filter((vinyl) => {
-    const term = `${vinyl.artist} ${vinyl.album}`.toLowerCase();
-    return term.includes(query.toLowerCase());
+    const term = `${vinyl.artist} ${vinyl.album} ${vinyl.genre} ${(vinyl.tags || []).join(" ")}`.toLowerCase();
+    const matchQuery = term.includes(query.toLowerCase());
+    if (!matchQuery) return false;
+    const best = getBestInventory(vinyl.id);
+    const activePrice = best
+      ? member
+        ? discountedPrice(best.price_normal)
+        : best.price_normal
+      : null;
+    if (catalogFilter === "all") return true;
+    if (catalogFilter === "discount") return discountVinylIds.has(vinyl.id);
+    if (catalogFilter === "rarity") return rarityVinylIds.has(vinyl.id);
+    if (catalogFilter === "up100") return activePrice !== null && activePrice <= 100;
+    if (catalogFilter === "up200") return activePrice !== null && activePrice <= 200;
+    if (catalogFilter === "70s") return vinyl.year >= 1970 && vinyl.year < 1980;
+    if (catalogFilter === "80s") return vinyl.year >= 1980 && vinyl.year < 1990;
+    if (catalogFilter === "90s") return vinyl.year >= 1990 && vinyl.year < 2000;
+    return true;
   });
+  const movementBase = useMemo(() => {
+    if (!movementLabel) return [];
+    const term = movementLabel.toLowerCase();
+    return vinyls.filter((vinyl) =>
+      `${vinyl.artist} ${vinyl.album} ${vinyl.genre} ${(vinyl.tags || []).join(" ")}`
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [movementLabel]);
+  const movementDisplay = useMemo(() => {
+    if (!movementLabel) return [];
+    const exact = vinyls.filter((vinyl) => vinyl.tags?.includes(movementLabel));
+    const ids = new Set(exact.map((item) => item.id));
+    const list = [...exact];
+
+    if (list.length < 4) {
+      movementBase.forEach((vinyl) => {
+        if (list.length >= 4) return;
+        if (ids.has(vinyl.id)) return;
+        ids.add(vinyl.id);
+        list.push(vinyl);
+      });
+    }
+
+    if (list.length < 4) {
+      vinyls.forEach((vinyl) => {
+        if (list.length >= 4) return;
+        if (ids.has(vinyl.id)) return;
+        ids.add(vinyl.id);
+        list.push(vinyl);
+      });
+    }
+
+    return list.slice(0, 4);
+  }, [movementLabel, movementBase]);
+  const movementPackage = useMemo(() => {
+    if (!movementDisplay.length) return null;
+    const picks = movementDisplay
+      .map((vinyl) => {
+        const best = getBestInventory(vinyl.id);
+        if (!best) return null;
+        const basePrice = member ? discountedPrice(best.price_normal) : best.price_normal;
+        return { vinyl, basePrice, partnerId: best.partner_id };
+      })
+      .filter(Boolean)
+      .slice(0, 4);
+    if (picks.length < 2) return null;
+    const totalBase = picks.reduce((sum, item) => sum + item.basePrice, 0);
+    const totalPack = Math.round(totalBase * 0.85);
+    return { picks, totalBase, totalPack };
+  }, [movementDisplay, member]);
 
   const pastSessions = sessions.filter(
     (session) => new Date(session.date) < new Date(today.toDateString())
@@ -240,70 +535,189 @@ const Home = ({ member, onReserve }) => {
 
   return (
     <main className="page">
-      <section className="section">
-        <div className="section-header">
-          <h2>Programacao do Ziggy Play</h2>
-          <p>
-            Cada sessão tem um tema. O que toca na sala guia o marketplace. Condição
-            especial para membros.
-          </p>
-        </div>
-        <div className="session-grid">
-          {sessions.map((session) => (
-            <SessionCard key={session.id} session={session} onReserve={onReserve} />
-          ))}
-        </div>
-        <Link to="/?catalog=1" className="section-link">
-          <span className="section-arrow" aria-hidden="true" />
-          Edicoes passadas
-        </Link>
-      </section>
+      {!catalogOnly ? (
+        <section className="section">
+          <div className="section-header">
+            <h2>Programação do Ziggy Play</h2>
+            <p>
+              Cada sessão tem um tema. O que toca na sala guia o marketplace. Condição
+              especial para membros.
+            </p>
+          </div>
+          <div className="session-grid">
+            {sessions.map((session) => (
+              <SessionCard key={session.id} session={session} onReserve={onReserve} />
+            ))}
+          </div>
+          <Link to="/market?catalog=1" className="section-link">
+            <span className="section-arrow" aria-hidden="true" />
+            Edicoes passadas
+          </Link>
+        </section>
+      ) : null}
 
-      <section className="section">
-        <div className="section-header">
-          <h2>Pecas em Destaque</h2>
-          <p>Discos que ja passaram pelo Ziggy Play em sessoes anteriores.</p>
-        </div>
-        <div className="vinyl-highlight">
-          {highlightVinyls.map((vinyl) => (
-            <div key={vinyl.id} className="highlight-item">
-              <div
-                className="highlight-cover"
-                style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
-              />
-              <div className="highlight-info">
-                <div className="vinyl-artist">{vinyl.artist}</div>
-                <div className="vinyl-album">{vinyl.album}</div>
-                <Link to={`/vinyl/${vinyl.id}`} className="primary-link">
-                  Ver disco
-                </Link>
+      {!catalogOnly ? (
+        <section className="section">
+          <div className="section-header">
+            <h2>Pecas em Destaque</h2>
+            <p>Discos que ja passaram pelo Ziggy Play em sessões anteriores.</p>
+          </div>
+          <div className="vinyl-highlight">
+            {highlightVinyls.map((vinyl) => (
+              <div key={vinyl.id} className="highlight-item">
+                <div
+                  className="highlight-cover"
+                  style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                />
+                <div className="highlight-info">
+                  <div className="vinyl-artist">{vinyl.artist}</div>
+                  <div className="vinyl-album">{vinyl.album}</div>
+                  <Link to={`/vinyl/${vinyl.id}`} className="primary-link">
+                    Ver disco
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <Link to="/?catalog=1" className="section-link">
-          <span className="section-arrow" aria-hidden="true" />
-          Ver todos
-        </Link>
-      </section>
+            ))}
+          </div>
+          <Link to="/market?catalog=1" className="section-link">
+            <span className="section-arrow" aria-hidden="true" />
+            Ver todos
+          </Link>
+        </section>
+      ) : null}
 
       <section className="section" id="catalog">
-        <div className="section-header">
-          <h2>Explorar Colecao</h2>
-          <p>Busca simples por artista ou album.</p>
-        </div>
-        <div className="search-row">
-          <input
-            type="search"
-            placeholder="Digite artista ou album"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <span className="result-count">{filtered.length} itens</span>
-        </div>
+        {!movementLabel ? (
+          <div className="section-header">
+            <h2>{catalogOnly ? "Catálogo Geral" : "Explorar Coleção"}</h2>
+            <p>Busca simples por artista ou album.</p>
+          </div>
+        ) : null}
+        {movementLabel ? (
+          <div className="catalog-context">
+            <div className="catalog-context-title">Movimento selecionado</div>
+            <div className="catalog-context-movement">{movementLabel}</div>
+            <p>
+              {movementDescriptions[movementLabel] ||
+                "Seleção contextual vinculada ao movimento da sessão, com critério de afinidade sonora."}
+            </p>
+            {movementPackage ? (
+              <div className="catalog-pack">
+                <div className="catalog-pack-title">Pacote do movimento</div>
+                <div className="catalog-pack-meta">
+                  {movementPackage.picks.map((item) => item.vinyl.album).join(" + ")}
+                </div>
+                <div className="catalog-pack-row">
+                  <div className="catalog-pack-price">
+                    <span className="old">{formatPrice(movementPackage.totalBase)}</span>
+                    <span className="new">{formatPrice(movementPackage.totalPack)}</span>
+                    <span className="off">15% OFF no pacote</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="pack-cart-button"
+                    aria-label="Adicionar pacote ao carrinho"
+                    onClick={() => onAddPackToCart?.(movementPackage.picks)}
+                  >
+                    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                      <path
+                        d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx="9" cy="20" r="1.3" fill="currentColor" />
+                      <circle cx="17" cy="20" r="1.3" fill="currentColor" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {!movementLabel ? (
+          <div className="catalog-filters">
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "all" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("all")}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "discount" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("discount")}
+            >
+              Com desconto
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "rarity" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("rarity")}
+            >
+              Raridades
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "up100" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("up100")}
+            >
+              Ate R$ 100
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "up200" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("up200")}
+            >
+              Ate R$ 200
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "70s" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("70s")}
+            >
+              Anos 70
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "80s" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("80s")}
+            >
+              Anos 80
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${catalogFilter === "90s" ? "is-active" : ""}`}
+              onClick={() => setCatalogFilter("90s")}
+            >
+              Anos 90
+            </button>
+          </div>
+        ) : null}
+        {!movementLabel ? (
+          <div className="search-row">
+            <input
+              type="search"
+              placeholder="Digite artista ou album"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <span className="result-count">{filtered.length} itens</span>
+          </div>
+        ) : null}
         <div className="vinyl-grid">
-          {filtered.map((vinyl) => (
-            <VinylCard key={vinyl.id} vinyl={vinyl} subtitle={`${vinyl.year} · ${vinyl.genre}`} />
+          {(movementLabel ? movementDisplay : filtered).map((vinyl) => (
+            <VinylCard
+              key={vinyl.id}
+              vinyl={vinyl}
+              subtitle={`${vinyl.year} · ${vinyl.genre}`}
+              member={member}
+              onAddToCart={onAddToCart}
+              onActivateMember={onActivateMember}
+            />
           ))}
         </div>
       </section>
@@ -311,13 +725,13 @@ const Home = ({ member, onReserve }) => {
   );
 };
 
-const SessionPage = ({ sessionId, member, onAddToCart }) => {
+const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember }) => {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) {
     return (
       <main className="page">
         <div className="section-header">
-          <h2>Sesao nao encontrada</h2>
+          <h2>Sesao não encontrada</h2>
           <Link to="/" className="primary-link">
             Voltar
           </Link>
@@ -328,11 +742,46 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
 
   const played = getSessionVinyls(session.id, "tocado");
   const related = getSessionVinyls(session.id, "relacionado");
+  const relatedDisplay = (() => {
+    const ids = new Set();
+    const list = [];
+
+    related.forEach((vinyl) => {
+      if (!ids.has(vinyl.id)) {
+        ids.add(vinyl.id);
+        list.push(vinyl);
+      }
+    });
+
+    if (list.length < 4) {
+      vinyls.forEach((vinyl) => {
+        if (ids.has(vinyl.id)) return;
+        if (played.some((item) => item.id === vinyl.id)) return;
+        ids.add(vinyl.id);
+        list.push(vinyl);
+      });
+    }
+
+    return list.slice(0, 4);
+  })();
   const movementTags = session?.movements || [];
   const movementGroups = movementTags.map((tag) => {
     const primary = vinyls.filter((vinyl) => vinyl.tags?.includes(tag));
     const nonPlayed = primary.filter((vinyl) => !played.some((item) => item.id === vinyl.id));
-    const items = (nonPlayed.length ? nonPlayed : primary).slice(0, 4);
+    const base = nonPlayed.length ? nonPlayed : primary;
+    const ids = new Set(base.map((item) => item.id));
+    const items = [...base];
+
+    if (items.length < 4) {
+      vinyls.forEach((vinyl) => {
+        if (items.length >= 4) return;
+        if (ids.has(vinyl.id)) return;
+        if (played.some((item) => item.id === vinyl.id)) return;
+        ids.add(vinyl.id);
+        items.push(vinyl);
+      });
+    }
+
     return { tag, items };
   });
 
@@ -355,7 +804,7 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
 
       <section className="section">
         <div className="section-header">
-          <h2>Selecao principal da noite</h2>
+          <h2>Seleção principal da noite</h2>
         </div>
         <div className="played-grid">
           {played.map((vinyl) => {
@@ -363,10 +812,12 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
             const partner = best ? getPartnerById(best.partner_id) : null;
             return (
               <div key={vinyl.id} className="played-card">
-                <div
-                  className="played-cover"
-                  style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
-                />
+                <Link to={`/vinyl/${vinyl.id}`}>
+                  <div
+                    className="played-cover"
+                    style={{ backgroundImage: `url(${vinyl.cover_image_url})` }}
+                  />
+                </Link>
                 <div className="played-info">
                   <div className="vinyl-artist">{vinyl.artist}</div>
                   <div className="vinyl-album">{vinyl.album}</div>
@@ -375,11 +826,19 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
                   </div>
                   {best && partner ? (
                     <div className="price-row">
-                      <div className="price-main">
-                        {member ? formatPrice(best.price_member) : formatPrice(best.price_normal)}
-                      </div>
+                      {member ? (
+                        <div className="price-main price-compare">
+                          <span className="price-old">{formatPrice(best.price_normal)}</span>
+                          <span className="price-new">{formatPrice(discountedPrice(best.price_normal))}</span>
+                        </div>
+                      ) : (
+                        <NonMemberPrice
+                          value={formatPrice(best.price_normal)}
+                          onActivate={onActivateMember}
+                        />
+                      )}
                       <div className="price-meta">
-                        {member ? "Condicao exclusiva Ziggyfy" : "Preco normal"}
+                        {member ? "15% OFF Membro Premium" : "Preço normal"}
                       </div>
                       <div className="price-partner-row">
                         <Link
@@ -415,11 +874,8 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
                       </div>
                     </div>
                   ) : (
-                    <div className="price-meta">Sem parceiro disponivel</div>
+                    <div className="price-meta">Sem parceiro disponível</div>
                   )}
-                  <Link to={`/vinyl/${vinyl.id}`} className="primary-link">
-                    Ver disco
-                  </Link>
                 </div>
               </div>
             );
@@ -429,7 +885,26 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
 
       <section className="section">
         <div className="section-header">
-          <h2>Explorar Alem da Sessao</h2>
+          <h2>Conhecer outros artistas</h2>
+          <p>Seleção relacionada ao tema da sessão.</p>
+        </div>
+        <div className="vinyl-grid">
+          {relatedDisplay.map((vinyl) => (
+            <VinylCard
+              key={vinyl.id}
+              vinyl={vinyl}
+              subtitle={`${vinyl.year} · ${vinyl.genre}`}
+              member={member}
+              onAddToCart={onAddToCart}
+              onActivateMember={onActivateMember}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-header">
+          <h2>Explorar Além da Sessão</h2>
           <p>Conexoes de movimento e afinidade para expandir a noite.</p>
         </div>
         <div className="context-block">
@@ -448,6 +923,12 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
                       />
                     </Link>
                   ))}
+                  <Link
+                    to={`/market?catalog=1&movement=${encodeURIComponent(group.tag)}`}
+                    className="movement-overlay"
+                  >
+                    +
+                  </Link>
                 </div>
               </div>
             ))}
@@ -457,24 +938,24 @@ const SessionPage = ({ sessionId, member, onAddToCart }) => {
 
       <section className="section">
         <div className="section-header">
-          <h2>Explorar Colecao Completa</h2>
+          <h2>Explorar Coleção Completa</h2>
           <p>Todo o acervo conectado aos parceiros.</p>
         </div>
-        <Link to="/?catalog=1" className="primary-link">
-          Ir para catalogo geral
+        <Link to="/market?catalog=1" className="primary-link">
+          Ir para catálogo geral
         </Link>
       </section>
     </main>
   );
 };
 
-const VinylPage = ({ vinylId, member, onAddToCart }) => {
+const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember }) => {
   const vinyl = getVinylById(vinylId);
   if (!vinyl) {
     return (
       <main className="page">
         <div className="section-header">
-          <h2>Disco nao encontrado</h2>
+          <h2>Disco não encontrado</h2>
           <Link to="/" className="primary-link">
             Voltar
           </Link>
@@ -508,7 +989,7 @@ const VinylPage = ({ vinylId, member, onAddToCart }) => {
               <div className="partner-list compact">
                 {items.map((item) => {
                   const partner = getPartnerById(item.partner_id);
-                  const price = member ? item.price_member : item.price_normal;
+                  const price = member ? discountedPrice(item.price_normal) : item.price_normal;
                   return (
                     <div key={`${item.partner_id}-${item.vinyl_id}`} className="partner-card compact">
                       <div>
@@ -527,11 +1008,18 @@ const VinylPage = ({ vinylId, member, onAddToCart }) => {
                       </div>
                       <div className="partner-price">
                         <div className="partner-price-main">
-                          <div className="price-main">{formatPrice(price)}</div>
                           {member ? (
-                            <div className="price-meta">Condicao exclusiva Ziggyfy</div>
+                            <div className="price-main price-compare">
+                              <span className="price-old">{formatPrice(item.price_normal)}</span>
+                              <span className="price-new">{formatPrice(price)}</span>
+                            </div>
                           ) : (
-                            <div className="price-meta">Preco normal</div>
+                            <NonMemberPrice value={formatPrice(price)} onActivate={onActivateMember} />
+                          )}
+                          {member ? (
+                            <div className="price-meta">15% OFF Membro Premium</div>
+                          ) : (
+                        <div className="price-meta">Preço normal</div>
                           )}
                         </div>
                         <button
@@ -660,7 +1148,7 @@ const PartnersPage = () => {
           <h2>Parceiros Ziggyfy</h2>
           <p>
             Lojistas enviam o acervo via template, a Ziggyfy conecta os discos as
-            sessoes e os usuarios compram diretamente do parceiro.
+            sessões e os usuarios compram diretamente do parceiro.
           </p>
         </div>
         <div className="partner-model">
@@ -674,7 +1162,7 @@ const PartnersPage = () => {
           <div className="model-step">
             <div className="model-label">2</div>
             <div>
-              <div className="model-title">Conexao com sessoes</div>
+              <div className="model-title">Conexao com sessões</div>
               <div className="model-desc">Discos vinculados ao contexto da sala.</div>
             </div>
           </div>
@@ -689,7 +1177,7 @@ const PartnersPage = () => {
             <div className="model-label">4</div>
             <div>
               <div className="model-title">Beneficios contextuais</div>
-              <div className="model-desc">Precos especiais para membros Ziggyfy.</div>
+              <div className="model-desc">Preços especiais para membros Ziggyfy.</div>
             </div>
           </div>
         </div>
@@ -701,19 +1189,22 @@ const PartnersPage = () => {
   );
 };
 
-const PartnerPage = ({ partnerId, onAddToCart }) => {
+const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember }) => {
   const partner = getPartnerById(partnerId);
   const partnerItems = inventory.filter((item) => item.partner_id === partnerId);
-  const partnerVinyls = partnerItems.map((item) => ({
-    ...getVinylById(item.vinyl_id),
-    inventory: item,
-  }));
+  const partnerVinyls = partnerItems
+    .map((item) => {
+      const vinyl = getVinylById(item.vinyl_id);
+      if (!vinyl) return null;
+      return { vinyl, inventory: item };
+    })
+    .filter(Boolean);
 
   if (!partner) {
     return (
       <main className="page">
         <div className="section-header">
-          <h2>Loja nao encontrada</h2>
+          <h2>Loja não encontrada</h2>
           <Link to="/" className="primary-link">
             Voltar
           </Link>
@@ -732,46 +1223,275 @@ const PartnerPage = ({ partnerId, onAddToCart }) => {
         <div className="partner-address">{partner.address}</div>
         <div className="vinyl-grid">
           {partnerVinyls.map((item) => (
-            <div key={item.id} className="vinyl-card">
-              <div className="vinyl-cover" style={{ backgroundImage: `url(${item.cover_image_url})` }} />
-              <div className="vinyl-info">
-                <div className="vinyl-artist">{item.artist}</div>
-                <div className="vinyl-album">{item.album}</div>
-                <div className="vinyl-subtitle">
-                  {formatPrice(item.inventory.price_normal)} · {item.inventory.availability_status}
-                </div>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Adicionar ao carrinho"
-                  onClick={() =>
-                    onAddToCart({
-                      vinylId: item.id,
-                      partnerId: item.inventory.partner_id,
-                    })
-                  }
-                >
-                  <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-                    <path
-                      d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <circle cx="9" cy="20" r="1.3" fill="currentColor" />
-                    <circle cx="17" cy="20" r="1.3" fill="currentColor" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <VinylCard
+              key={item.vinyl.id}
+              vinyl={item.vinyl}
+              subtitle={`${item.vinyl.year} · ${item.vinyl.genre}`}
+              member={member}
+              onAddToCart={onAddToCart}
+              inventoryItem={item.inventory}
+              onActivateMember={onActivateMember}
+            />
           ))}
         </div>
       </section>
     </main>
   );
 };
+
+const MenuPage = () => (
+  <main className="page menu-page">
+    <section className="section club-hero menu-hero">
+      <div className="club-hero-layout">
+        <div
+          className="club-hero-image menu-hero-image"
+          aria-label="Ambiente Ziggy Play"
+        >
+          <img src={imagemCardapio2} alt="" loading="eager" decoding="async" />
+        </div>
+        <div className="club-hero-copy">
+          <div className="menu-hero-kicker">A COZINHA</div>
+          <h1>
+            We can be foodies <span className="club-title-line">just for one day</span>
+          </h1>
+          <p>
+            No bar, trabalhamos exclusivamente com produtores brasileiros: whisky Lamas do Rio
+            Grande do Sul, gin Amazzoni, vermute e bitter Enraizes, vinhos naturais do Sul e de
+            São Paulo, conservas Tours, cervejas artesanais. A carta e inteira nacional, dos
+            destilados aos queijos.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section className="section">
+      <div className="section-header">
+        <h2>Bebidas (Cult Brasileiro)</h2>
+      </div>
+      <div className="menu-section">
+        <div className="menu-section-title">Whiskey</div>
+        <div className="menu-table">
+          <div className="menu-row">
+            <div className="menu-col-title">Blackstar</div>
+            <div className="menu-col-subtitle">Lamas Single Malt (RS)</div>
+            <div className="menu-col-desc">
+              Whisky artesanal brasileiro, maturado em barris de carvalho. Notas de baunilha, leve
+              defumado e final macio. Dose de 50ml. Servido puro ou com gelo grande.
+            </div>
+            <div className="menu-col-price">R$ 58 · dose</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Golden Years</div>
+            <div className="menu-col-subtitle">Lamas Bourbon Style / Blend Especial</div>
+            <div className="menu-col-desc">
+              Perfil quente e envolvente, com notas de caramelo e especiarias suaves. Dose de 50ml.
+              Servido puro ou com gelo.
+            </div>
+            <div className="menu-col-price">R$ 54 · dose</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="menu-section">
+        <div className="menu-section-title">Drinks</div>
+        <div className="menu-table">
+          <div className="menu-row">
+            <div className="menu-col-title">Starman</div>
+            <div className="menu-col-subtitle">Old Fashioned Brasil</div>
+            <div className="menu-col-desc">
+              Whisky Lamas, bitter artesanal Enraizes, acucar e casca de laranja. Denso, elegante e
+              levemente especiado.
+            </div>
+            <div className="menu-col-price">R$ 46 · coquetel</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Let's Dance</div>
+            <div className="menu-col-subtitle">Negroni Brasileiro</div>
+            <div className="menu-col-desc">
+              Gin Amazzoni, Vermute Rosso Enraizes, Bitter artesanal brasileiro. Intenso, herbal,
+              equilibrado.
+            </div>
+            <div className="menu-col-price">R$ 44 · coquetel</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Modern Love</div>
+            <div className="menu-col-subtitle">Gin & Tônica Botanica</div>
+            <div className="menu-col-desc">
+              Gin Amazzoni ou Yvy Mar, tonica brasileira premium, toque citrico. Fresco, aromatico,
+              vibrante.
+            </div>
+            <div className="menu-col-price">R$ 38 · coquetel</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="menu-section">
+        <div className="menu-section-title">Vinhos</div>
+        <div className="menu-table">
+          <div className="menu-row">
+            <div className="menu-col-title">Sound & Vision</div>
+            <div className="menu-col-subtitle">Vivente Branco Natural (RS)</div>
+            <div className="menu-col-desc">
+              Mineral, acido na medida certa, extremamente gastronomico. Taca 150ml.
+            </div>
+            <div className="menu-col-price">R$ 36 · taça</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Life on Mars?</div>
+            <div className="menu-col-subtitle">Casa Viccas Rose Natural (SP)</div>
+            <div className="menu-col-desc">Leve, fresco, textura delicada. Taca 150ml.</div>
+            <div className="menu-col-price">R$ 34 · taça</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Heroes</div>
+            <div className="menu-col-subtitle">Dominio Vicari Tinto Natural (RS)</div>
+            <div className="menu-col-desc">Leve, frutado, fácil de beber. Taça 150ml.</div>
+            <div className="menu-col-price">R$ 38 · taça</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="menu-section">
+        <div className="menu-section-title">Cervejas artesanais</div>
+        <div className="menu-table">
+          <div className="menu-row">
+            <div className="menu-col-title">Rebel Rebel</div>
+            <div className="menu-col-subtitle">Dadiva Pilsen</div>
+            <div className="menu-col-desc">Classica, limpa, refrescante.</div>
+            <div className="menu-col-price">R$ 24 · lata</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Changes</div>
+            <div className="menu-col-subtitle">Tarantino Session IPA ou Sour Leve</div>
+            <div className="menu-col-desc">Aromatica, leve, com personalidade.</div>
+            <div className="menu-col-price">R$ 28 · lata</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="menu-section">
+        <div className="menu-section-title">Não alcoólicos</div>
+        <div className="menu-table">
+          <div className="menu-row">
+            <div className="menu-col-title">Ashes to Ashes</div>
+            <div className="menu-col-subtitle">Kombucha artesanal brasileira</div>
+            <div className="menu-col-desc">(Hibisco ou gengibre) leve, fermentada, refrescante.</div>
+            <div className="menu-col-price">R$ 18 · garrafa</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Space Oddity</div>
+            <div className="menu-col-subtitle">Água com gas + limão siciliano</div>
+            <div className="menu-col-desc">Simples, elegante, essencial.</div>
+            <div className="menu-col-price">R$ 12 · copo</div>
+          </div>
+          <div className="menu-row">
+            <div className="menu-col-title">Refris e agua normal</div>
+            <div className="menu-col-subtitle">&nbsp;</div>
+            <div className="menu-col-desc">Selecionados da casa.</div>
+            <div className="menu-col-price">R$ 10 · un.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section className="section">
+      <div className="section-header">
+        <h2>Comidinhas</h2>
+      </div>
+      <div className="menu-section-title">Petiscos</div>
+      <div className="menu-table">
+        <div className="menu-row">
+          <div className="menu-col-title">Station to Station</div>
+          <div className="menu-col-subtitle">Tábua brasileira</div>
+          <div className="menu-col-desc">
+            Queijos artesanais nacionais (cabra, mofo branco ou canastra), nozes e mel.
+          </div>
+          <div className="menu-col-price">R$ 54 · porcao</div>
+        </div>
+        <div className="menu-row">
+          <div className="menu-col-title">Diamond Dogs</div>
+          <div className="menu-col-subtitle">Atum em azeite - Tours Conservas</div>
+          <div className="menu-col-desc">
+            Atum solido brasileiro servido com pao rustico e manteiga artesanal.
+          </div>
+          <div className="menu-col-price">R$ 48 · porcao</div>
+        </div>
+        <div className="menu-row">
+          <div className="menu-col-title">Young Americans</div>
+          <div className="menu-col-subtitle">Snacks selecionados</div>
+          <div className="menu-col-desc">
+            Amendoas defumadas, azeitonas marinadas e chips artesanais.
+          </div>
+          <div className="menu-col-price">R$ 36 · porcao</div>
+        </div>
+      </div>
+    </section>
+  </main>
+);
+
+const ClubePage = () => (
+  <main className="page clube-page">
+    <section className="section club-hero">
+      <div className="club-hero-layout">
+        <div
+          className="club-hero-image"
+          aria-label="Clube Ziggy Play"
+        >
+          <img src={capaHero} alt="" loading="eager" decoding="async" />
+        </div>
+        <div className="club-hero-copy">
+          <div className="menu-hero-kicker">O CLUBE</div>
+          <h1>Ground Control to Member Tom</h1>
+          <p>
+            O Clube Ziggy Play é a camada de participação contínua do espaço. Ele conecta a programação
+            da sala ao marketplace contextual e cria vantagens reais para quem quer participar
+            ativamente da circulação de acervos.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section className="section">
+      <div className="section-header">
+        <h2>Comparar planos</h2>
+        <p>Quer destravar o ecossistema do Ziggy? Escolha um plano abaixo.</p>
+      </div>
+      <div className="club-plan-grid">
+        <article className="club-plan-card">
+          <div className="club-tier">Ziggy Free</div>
+          <p>
+            Participa da comunidade, tem acesso ao marketplace de vinis e recebe a programação com
+            antecedência.
+          </p>
+          <div className="club-actions">
+            <a
+              className="primary-button"
+              href="https://wa.me/5500000000000"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Entrar no Ziggy Free
+            </a>
+          </div>
+        </article>
+        <article className="club-plan-card premium">
+          <div className="club-tier">Ziggy Stardust</div>
+          <p>
+            Tudo do Ziggy Free, mais descontos especiais na compra de vinis com parceiros e
+            prioridade na participação de sessões especiais com convidados.
+          </p>
+          <div className="club-actions">
+            <button type="button" className="primary-button">
+              Assinar Ziggy Stardust
+              <span className="club-price-in-cta"> - R$ 49 / mes</span>
+            </button>
+            <div className="club-price-inline">R$ 49 / mes</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+);
 
 const App = () => {
   const [member, setMember] = useMember();
@@ -797,13 +1517,16 @@ const App = () => {
 
   const route = useMemo(() => {
     const cleanPath = path.split("?")[0];
-    if (cleanPath === "/") return { name: "home" };
+    if (cleanPath === "/") return { name: "sala" };
     if (cleanPath.startsWith("/session/"))
       return { name: "session", id: cleanPath.replace("/session/", "") };
     if (cleanPath.startsWith("/vinyl/"))
       return { name: "vinyl", id: cleanPath.replace("/vinyl/", "") };
     if (cleanPath.startsWith("/partner/"))
       return { name: "partner", id: cleanPath.replace("/partner/", "") };
+    if (cleanPath === "/clube") return { name: "clube" };
+    if (cleanPath === "/market") return { name: "market" };
+    if (cleanPath === "/menu") return { name: "menu" };
     if (cleanPath === "/partners") return { name: "partners" };
     return { name: "notfound" };
   }, [path]);
@@ -888,7 +1611,7 @@ const App = () => {
                 </label>
                 <label>
                   Email
-                  <input required type="email" name="email" placeholder="voce@email.com" />
+                  <input required type="email" name="email" placeholder="você@email.com" />
                 </label>
                 <label>
                   Telefone
@@ -899,7 +1622,7 @@ const App = () => {
                   <input type="text" name="cpf" placeholder="000.000.000-00" />
                 </label>
                 <div className="modal-note">
-                  Taxa de reserva R$ 20, recuperavel na consumacao.
+                  Taxa de reserva R$ 20, recuperável na consumação.
                 </div>
                 <button type="submit" className="primary-button">
                   Pagar reserva R$ 20
@@ -909,7 +1632,7 @@ const App = () => {
               <div className="modal-body">
                 <div className="modal-success">Reserva confirmada.</div>
                 <div className="modal-note">
-                  Voce recebera a confirmacao por email. A taxa sera abatida na consumacao.
+                  Você receberá a confirmação por email. A taxa será abatida na consumação.
                 </div>
                 <button
                   type="button"
@@ -946,7 +1669,7 @@ const App = () => {
                   (entry) => entry.vinyl_id === item.vinylId && entry.partner_id === item.partnerId
                 );
                 if (!vinyl || !partner || !listing) return null;
-                const price = member ? listing.price_member : listing.price_normal;
+                const price = member ? discountedPrice(listing.price_normal) : listing.price_normal;
                 return (
                   <div key={`${item.vinylId}-${item.partnerId}`} className="cart-item">
                     <div
@@ -957,7 +1680,14 @@ const App = () => {
                       <div className="vinyl-artist">{vinyl.artist}</div>
                       <div className="vinyl-album">{vinyl.album}</div>
                       <div className="cart-meta">{partner.name}</div>
-                      <div className="price-main">{formatPrice(price)}</div>
+                      {member ? (
+                        <div className="price-main price-compare">
+                          <span className="price-old">{formatPrice(listing.price_normal)}</span>
+                          <span className="price-new">{formatPrice(price)}</span>
+                        </div>
+                      ) : (
+                        <NonMemberPrice value={formatPrice(price)} onActivate={() => setMember(true)} />
+                      )}
                       <div className="cart-actions">
                         <button type="button" className="primary-button">
                           Finalizar compra
@@ -987,9 +1717,54 @@ const App = () => {
           ) : null}
         </div>
       ) : null}
-      {route.name === "home" && (
-        <Home
+      {cart.length ? (
+        <button
+          type="button"
+          className="floating-cart-button"
+          onClick={() => setCartOpen(true)}
+          aria-label="Abrir carrinho"
+          title="Carrinho"
+        >
+          <span className="cart-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <path
+                d="M6 6h14l-1.6 8.2a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L5.5 4H3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="9" cy="20" r="1.3" fill="currentColor" />
+              <circle cx="17" cy="20" r="1.3" fill="currentColor" />
+            </svg>
+          </span>
+          <span className="floating-cart-count">{cart.length}</span>
+        </button>
+      ) : null}
+      {route.name === "sala" && (
+        <SalaPage
+          onReserve={(session) => {
+            setReserveSession(session);
+            setReserveSuccess(false);
+            setReserveOpen(true);
+          }}
+        />
+      )}
+      {route.name === "market" && (
+        <MarketplacePage
           member={member}
+          onActivateMember={() => setMember(true)}
+          onAddToCart={requestAddToCart}
+          onAddPackToCart={(packItems) => {
+            if (!packItems?.length) return;
+            packItems.forEach((item) => {
+              addItem({
+                vinylId: item.vinyl.id,
+                partnerId: item.partnerId,
+              });
+            });
+          }}
           onReserve={(session) => {
             setReserveSession(session);
             setReserveSuccess(false);
@@ -998,19 +1773,36 @@ const App = () => {
         />
       )}
       {route.name === "session" && (
-        <SessionPage sessionId={route.id} member={member} onAddToCart={requestAddToCart} />
+        <SessionPage
+          sessionId={route.id}
+          member={member}
+          onAddToCart={requestAddToCart}
+          onActivateMember={() => setMember(true)}
+        />
       )}
       {route.name === "vinyl" && (
-        <VinylPage vinylId={route.id} member={member} onAddToCart={requestAddToCart} />
+        <VinylPage
+          vinylId={route.id}
+          member={member}
+          onAddToCart={requestAddToCart}
+          onActivateMember={() => setMember(true)}
+        />
       )}
       {route.name === "partner" && (
-        <PartnerPage partnerId={route.id} onAddToCart={requestAddToCart} />
+        <PartnerPage
+          partnerId={route.id}
+          onAddToCart={requestAddToCart}
+          member={member}
+          onActivateMember={() => setMember(true)}
+        />
       )}
+      {route.name === "clube" && <ClubePage />}
+      {route.name === "menu" && <MenuPage />}
       {route.name === "partners" && <PartnersPage />}
       {route.name === "notfound" && (
         <main className="page">
           <div className="section-header">
-            <h2>Pagina nao encontrada</h2>
+            <h2>Pagina não encontrada</h2>
             <Link to="/" className="primary-link">
               Voltar
             </Link>
@@ -1018,8 +1810,11 @@ const App = () => {
         </main>
       )}
       <footer className="footer">
-        <div>Marketplace contextual conectado a sala de escuta.</div>
-        <div>Ziggyfy · Prototype 2026</div>
+        <div className="footer-main">
+          <div className="footer-brand">Ziggy Play</div>
+          <div className="footer-address">Endereco Av Sao Luiz 222, Centro de SP</div>
+        </div>
+        <div className="footer-quote">we are absolute beginners</div>
       </footer>
     </div>
   );

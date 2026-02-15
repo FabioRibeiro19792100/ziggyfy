@@ -22,7 +22,7 @@ const makeCoverDataUrl = (artist, album, seed = 0) => {
       <text x="70" y="140" fill="#f1efea" font-family="Cormorant Garamond" font-size="40" font-weight="600">Ziggy Play</text>
       <text x="70" y="210" fill="#f1efea" font-family="Inter" font-size="20" font-weight="400">${artist}</text>
       <text x="70" y="250" fill="#f1efea" font-family="Inter" font-size="18" font-weight="300">${album}</text>
-      <text x="70" y="530" fill="#f1efea" font-family="Inter" font-size="14" font-weight="300" opacity="0.7">Colecao privada</text>
+      <text x="70" y="530" fill="#f1efea" font-family="Inter" font-size="14" font-weight="300" opacity="0.7">Coleção privada</text>
       <text x="70" y="560" fill="#f1efea" font-family="Inter" font-size="14" font-weight="300" opacity="0.7">Pressagem selecionada</text>
     </svg>
   `;
@@ -34,22 +34,22 @@ export const partners = [
     id: "p1",
     name: "Casa Audionauta",
     url: "https://casaudionauta.com",
-    description: "Curadoria focada em prensagens originais e edicoes audiophile.",
-    address: "Rua das Agulhas, 82 · Pinheiros · Sao Paulo",
+    description: "Curadoria focada em prensagens originais e edições audiophile.",
+    address: "Rua das Agulhas, 82 · Pinheiros · São Paulo",
   },
   {
     id: "p2",
     name: "Rota do Vinil",
     url: "https://rotadovinil.com",
-    description: "Acervo amplo com raridades brasileiras e importados classicos.",
-    address: "Av. Aurora, 155 · Centro · Sao Paulo",
+    description: "Acervo amplo com raridades brasileiras e importados clássicos.",
+    address: "Av. Aurora, 155 · Centro · São Paulo",
   },
   {
     id: "p3",
     name: "Selo Sonoro",
     url: "https://selosonoro.com",
-    description: "Selecao de dub, soul e new wave com foco em condicao premium.",
-    address: "Rua do Som, 41 · Santa Cecilia · Sao Paulo",
+    description: "Seleção de dub, soul e new wave com foco em condição premium.",
+    address: "Rua do Som, 41 · Santa Cecilia · São Paulo",
   },
 ];
 
@@ -214,7 +214,7 @@ export const vinyls = [
     cover_image_url: "https://upload.wikimedia.org/wikipedia/en/f/ff/Transa.jpg",
     tags: ["Tropicalia tardia", "Samba de estrada"],
     description:
-      "Gravado em exilio, mistura ingles e portugues com blues e samba. Um disco livre e aberto.",
+      "Gravado em exílio, mistura ingles e português com blues e samba. Um disco livre e aberto.",
     tracklist: [
       "You Don't Know Me",
       "Nine Out of Ten",
@@ -227,7 +227,7 @@ export const vinyls = [
     tech: {
       label: "Philips",
       producer: "Ralph Mace",
-      studio: "Londres (exilio)",
+      studio: "Londres (exílio)",
       country: "Reino Unido",
     },
   },
@@ -271,7 +271,7 @@ export const vinyls = [
     cover_image_url: "https://upload.wikimedia.org/wikipedia/en/9/9d/AT%C3%A1buaDeEsmeralda.jpg",
     tags: ["Tropicalia tardia", "Samba de estrada"],
     description:
-      "Samba funk alquimico com guitarras secas e letras misticas. Groove hipnotico.",
+      "Samba funk alquímico com guitarras secas e letras místicas. Groove hipnótico.",
     tracklist: [
       "Os alquimistas estão chegando os alquimistas",
       "O homem da gravata florida",
@@ -375,7 +375,7 @@ export const vinyls = [
       label: "Kling Klang; EMI Electrola",
       producer: "Ralf Hütter, Florian Schneider",
       studio: "Kling Klang (Düsseldorf)",
-      country: "Alemanha",
+      country: "Alémanha",
     },
   },
   {
@@ -622,7 +622,7 @@ export const inventory = [
     quantity: 2,
     cover_image_url: vinyls[6].cover_image_url,
     product_url: "https://selosonoro.com/ziggy/acabou-chorare",
-    notes: "Reedicao classica",
+    notes: "Reedicao clássica",
   },
   {
     vinyl_id: "v8",
