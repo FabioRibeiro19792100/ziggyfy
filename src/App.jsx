@@ -1396,7 +1396,7 @@ const MenuPage = () => (
 
     <section className="section">
       <div className="section-header">
-        <h2>Comidinhas</h2>
+        <h2>Comidinhas (Spiders from Kitchen)</h2>
       </div>
       <div className="menu-section-title">Petiscos</div>
       <div className="menu-table">
