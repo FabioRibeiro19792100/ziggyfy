@@ -302,7 +302,14 @@ const SalaPage = ({ onReserve }) => {
         />
         <div className="sala-hero-copy">
           <div className="menu-hero-kicker sala-hero-kicker">A SALA</div>
-          <p>Um lugar onde a música é redonda e plana</p>
+          <p className="sala-hero-title">
+            <span className="sala-hero-title-line">Um lugar</span>{" "}
+            <span className="sala-hero-title-line">onde a música</span>{" "}
+            <span className="sala-hero-title-line">é redonda e plana</span>
+          </p>
+          <p className="sala-hero-description">
+            Audições programadas de vinil, <span className="sala-hero-description-break">todos os dias</span>
+          </p>
         </div>
       </section>
 
