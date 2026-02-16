@@ -38,13 +38,13 @@ const getInitials = (value = "") =>
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
 const CATALOG_FILTER_OPTIONS = [
   { id: "all", label: "Todos" },
-  { id: "discount", label: "Com desconto" },
   { id: "rarity", label: "Raridades" },
   { id: "up100", label: "Ate R$ 100" },
   { id: "up200", label: "Ate R$ 200" },
   { id: "70s", label: "Anos 70" },
   { id: "80s", label: "Anos 80" },
   { id: "90s", label: "Anos 90" },
+  { id: "discount", label: "🔥 Queima de estoque" },
 ];
 const COVER_CACHE_KEY = "ziggy_real_cover_cache_v3";
 const COVER_MISS_PREFIX = "__MISS__:";
@@ -385,8 +385,10 @@ const Link = ({ to, children, className }) => (
           const target = document.getElementById(hash);
           if (target) {
             const nav = document.querySelector(".top-nav");
+            const quickNav = document.querySelector(".mobile-quick-nav");
             const navHeight = nav ? nav.getBoundingClientRect().height : 0;
-            const top = target.getBoundingClientRect().top + window.scrollY - navHeight;
+            const quickNavHeight = quickNav ? quickNav.getBoundingClientRect().height : 0;
+            const top = target.getBoundingClientRect().top + window.scrollY - navHeight - quickNavHeight;
             window.scrollTo({ top, behavior: "smooth" });
             return;
           }
@@ -509,13 +511,35 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
   </header>
 );
 
+const MobileQuickAccessNav = ({ onReserve, sessionTitle }) => (
+  <div className="mobile-quick-nav" aria-label="Acesso rápido">
+    <div className="mobile-quick-nav-title">
+      <span className="mobile-quick-nav-title-desktop">Acesso rápido</span>
+      <span className="mobile-quick-nav-title-mobile">{sessionTitle}</span>
+    </div>
+    <div className="mobile-quick-nav-links">
+      <button type="button" className="mobile-quick-nav-link" onClick={onReserve}>
+        Reservar
+      </button>
+      <Link to="/clube" className="mobile-quick-nav-link">
+        Tornar-se membro
+      </Link>
+      <Link to="/menu" className="mobile-quick-nav-link">
+        Ver cardápio
+      </Link>
+    </div>
+  </div>
+);
+
 const CatalogFilters = ({ activeFilter, onChange }) => (
   <div className="catalog-filters">
     {CATALOG_FILTER_OPTIONS.map((option) => (
       <button
         key={option.id}
         type="button"
-        className={`filter-chip ${activeFilter === option.id ? "is-active" : ""}`}
+        className={`filter-chip ${option.id === "discount" ? "is-clearance" : ""} ${
+          activeFilter === option.id ? "is-active" : ""
+        }`}
         onClick={() => onChange(option.id)}
       >
         {option.label}
@@ -1069,22 +1093,6 @@ const SessionPage = ({
   const guestInitials = getInitials(session?.guest_name || "Convidado");
   const guestBio = session?.guest_bio || "";
   const sessionLongDescription = session?.detail_description || session?.description || "";
-  const sessionActionCard = (
-    <aside className="session-quick-card" aria-label="Ações da sessão">
-      <div className="meta-label">Acesso rápido</div>
-      <div className="session-quick-links">
-        <button type="button" className="session-cta-link" onClick={() => onReserve(session)}>
-          Reservar
-        </button>
-        <Link to="/clube" className="session-cta-link">
-          Tornar-se membro
-        </Link>
-        <Link to="/menu" className="session-cta-link">
-          Ver cardápio
-        </Link>
-      </div>
-    </aside>
-  );
   const movementGroups = movementTags.map((tag) => {
     const primary = vinyls.filter((vinyl) => vinyl.tags?.includes(tag));
     const primaryReal = primary.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
@@ -1137,7 +1145,6 @@ const SessionPage = ({
                     ))}
                   </div>
                 ) : null}
-                {sessionActionCard}
               </div>
             </div>
             <div className="session-guest-photo">
@@ -1179,7 +1186,6 @@ const SessionPage = ({
                     ))}
                   </div>
                 ) : null}
-                {sessionActionCard}
               </div>
             </div>
           </div>
@@ -2143,12 +2149,25 @@ const App = () => {
     if (cleanPath === "/partners") return { name: "partners" };
     return { name: "notfound" };
   }, [path]);
+  const nextReservableSession = useMemo(() => {
+    const now = new Date();
+    return (
+      [...sessions]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .find((session) => new Date(session.date) >= new Date(now.toDateString())) || null
+    );
+  }, []);
 
   useEffect(() => {
     const syncTopNavHeight = () => {
       const topNav = document.querySelector(".top-nav");
-      const height = topNav ? Math.ceil(topNav.getBoundingClientRect().height) : 0;
+      const quickNav = document.querySelector(".mobile-quick-nav");
+      const height = topNav ? Math.round(topNav.getBoundingClientRect().height) : 0;
+      const quickNavDisplay = quickNav ? window.getComputedStyle(quickNav).display : "none";
+      const quickNavHeight =
+        quickNav && quickNavDisplay !== "none" ? Math.round(quickNav.getBoundingClientRect().height) : 0;
       document.documentElement.style.setProperty("--top-nav-height", `${height}px`);
+      document.documentElement.style.setProperty("--mobile-quick-nav-height", `${quickNavHeight}px`);
     };
     syncTopNavHeight();
     const frame = window.requestAnimationFrame(syncTopNavHeight);
@@ -2209,6 +2228,20 @@ const App = () => {
         cartCount={cart.length}
         onToggleCart={() => setCartOpen((prev) => !prev)}
       />
+      {route.name !== "notfound" ? (
+        <MobileQuickAccessNav
+          sessionTitle={
+            nextReservableSession
+              ? `${formatDate(nextReservableSession.date)} · ${nextReservableSession.theme}`
+              : "Próxima sessão em breve"
+          }
+          onReserve={() => {
+            setReserveSession(nextReservableSession);
+            setReserveSuccess(false);
+            setReserveOpen(true);
+          }}
+        />
+      ) : null}
       {reserveOpen ? (
         <div className="modal-overlay" onClick={() => setReserveOpen(false)}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
