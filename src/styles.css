@@ -4224,10 +4224,19 @@ a {
   .session-quick-card {
     width: 100vw;
     max-width: none;
+    order: -1;
+    position: sticky;
+    top: 118px;
+    z-index: 8;
     margin-top: 4px;
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
     padding: 8px 16px 6px;
+    border-left: 0;
+    border-top: 1px solid rgba(236, 210, 150, 0.16);
+    border-bottom: 1px solid rgba(236, 210, 150, 0.16);
+    background: rgba(12, 11, 9, 0.9);
+    backdrop-filter: blur(10px);
   }
 
   .session-guest-feature {

@@ -313,7 +313,14 @@ const useCart = () => {
   const [cart, setCart] = useState(() => {
     if (typeof window === "undefined") return [];
     const stored = window.localStorage.getItem("ziggy_cart");
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    try {
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      window.localStorage.removeItem("ziggy_cart");
+      return [];
+    }
   });
 
   useEffect(() => {
