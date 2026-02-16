@@ -2228,7 +2228,7 @@ const App = () => {
         cartCount={cart.length}
         onToggleCart={() => setCartOpen((prev) => !prev)}
       />
-      {route.name !== "notfound" ? (
+      {route.name === "session" ? (
         <MobileQuickAccessNav
           sessionTitle={
             nextReservableSession
