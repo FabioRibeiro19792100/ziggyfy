@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { inventory, partners, sessions, sessionVinyl, vinyls } from "./data.js";
+import realCoverMap from "./realCoverMap.json";
 import imagemCardapio2 from "../Cardapio2.jpg";
 import capaHero from "../capahero.webp";
 import capaHero4 from "../capa4.webp";
@@ -35,7 +36,9 @@ const getInitials = (value = "") =>
     .join("");
 
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
-const COVER_CACHE_KEY = "ziggy_real_cover_cache_v2";
+const COVER_CACHE_KEY = "ziggy_real_cover_cache_v3";
+const COVER_MISS_PREFIX = "__MISS__:";
+const COVER_MISS_RETRY_MS = 1000 * 60 * 60 * 6;
 
 const normalizeCoverText = (value = "") =>
   value
@@ -65,6 +68,19 @@ const getArtworkFromItunesResult = (result) => {
 
 const isGeneratedCover = (url = "") => url.startsWith("data:image/svg+xml");
 const hasRealCoverUrl = (url = "") => Boolean(url) && !isGeneratedCover(url);
+const makeMissCoverValue = () => `${COVER_MISS_PREFIX}${Date.now()}`;
+const parseCoverCacheValue = (value) => {
+  if (typeof value !== "string" || !value) return { type: "empty", url: "" };
+  if (value.startsWith(COVER_MISS_PREFIX)) {
+    const timestamp = Number(value.slice(COVER_MISS_PREFIX.length));
+    return { type: "miss", timestamp: Number.isFinite(timestamp) ? timestamp : 0, url: "" };
+  }
+  return { type: "hit", url: value };
+};
+const shouldRetryCoverLookup = (value) => {
+  const parsed = parseCoverCacheValue(value);
+  return parsed.type === "miss" && Date.now() - parsed.timestamp >= COVER_MISS_RETRY_MS;
+};
 
 const rankItunesResult = (result, artist, album) => {
   const artistNorm = normalizeCoverText(getPrimaryArtist(artist));
@@ -94,6 +110,53 @@ const isTrustedItunesMatch = (result, artist, album) => {
   return score >= 8 && albumMatches && artistMatches;
 };
 
+const fetchItunesByJsonp = (term) =>
+  new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      reject(new Error("jsonp unavailable"));
+      return;
+    }
+
+    const callbackName = `ziggyItunesJsonp_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("itunes jsonp timeout"));
+    }, 8000);
+
+    window[callbackName] = (payload) => {
+      window.clearTimeout(timeout);
+      cleanup();
+      resolve(Array.isArray(payload?.results) ? payload.results : []);
+    };
+
+    script.onerror = () => {
+      window.clearTimeout(timeout);
+      cleanup();
+      reject(new Error("itunes jsonp error"));
+    };
+    script.src = `https://itunes.apple.com/search?media=music&entity=album&limit=8&term=${term}&callback=${callbackName}`;
+    document.body.appendChild(script);
+  });
+
+const fetchItunesResults = async (term) => {
+  const endpoint = `https://itunes.apple.com/search?media=music&entity=album&limit=8&term=${term}`;
+  try {
+    const response = await fetch(endpoint);
+    if (response.ok) {
+      const payload = await response.json();
+      const results = Array.isArray(payload?.results) ? payload.results : [];
+      if (results.length) return results;
+    }
+  } catch {}
+
+  return fetchItunesByJsonp(term);
+};
+
 const useRealCoverResolver = () => {
   const [coverMap, setCoverMap] = useState(() => {
     if (typeof window === "undefined") return {};
@@ -114,7 +177,11 @@ const useRealCoverResolver = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const missing = vinyls.filter((vinyl) => coverMap[vinyl.id] === undefined);
+    const missing = vinyls.filter((vinyl) => {
+      if (realCoverMap[vinyl.id]) return false;
+      const cacheValue = coverMap[vinyl.id];
+      return cacheValue === undefined || shouldRetryCoverLookup(cacheValue);
+    });
     if (!missing.length) return () => {};
 
     const fetchCovers = async () => {
@@ -122,17 +189,9 @@ const useRealCoverResolver = () => {
         if (cancelled) break;
         try {
           const term = encodeURIComponent(`${getPrimaryArtist(vinyl.artist)} ${vinyl.album}`);
-          const response = await fetch(
-            `https://itunes.apple.com/search?media=music&entity=album&limit=8&term=${term}`
-          );
-          if (!response.ok) {
-            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
-            continue;
-          }
-          const payload = await response.json();
-          const results = Array.isArray(payload?.results) ? payload.results : [];
+          const results = await fetchItunesResults(term);
           if (!results.length) {
-            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: makeMissCoverValue() }));
             continue;
           }
 
@@ -140,12 +199,12 @@ const useRealCoverResolver = () => {
             (a, b) => rankItunesResult(b, vinyl.artist, vinyl.album) - rankItunesResult(a, vinyl.artist, vinyl.album)
           )[0];
           if (!best || !isTrustedItunesMatch(best, vinyl.artist, vinyl.album)) {
-            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: makeMissCoverValue() }));
             continue;
           }
           const coverUrl = getArtworkFromItunesResult(best);
           if (!coverUrl || cancelled) {
-            setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+            setCoverMap((prev) => ({ ...prev, [vinyl.id]: makeMissCoverValue() }));
             continue;
           }
 
@@ -154,7 +213,7 @@ const useRealCoverResolver = () => {
             return { ...prev, [vinyl.id]: coverUrl };
           });
         } catch {
-          setCoverMap((prev) => ({ ...prev, [vinyl.id]: null }));
+          setCoverMap((prev) => ({ ...prev, [vinyl.id]: makeMissCoverValue() }));
         }
       }
     };
@@ -167,11 +226,10 @@ const useRealCoverResolver = () => {
   }, [coverMap]);
 
   return (vinyl) => {
-    const cached = coverMap[vinyl.id];
-    if (cached) return cached;
-    if (cached === null) return "";
-    if (vinyl.cover_image_url && !isGeneratedCover(vinyl.cover_image_url)) return vinyl.cover_image_url;
-    return "";
+    if (realCoverMap[vinyl.id]) return realCoverMap[vinyl.id];
+    const parsed = parseCoverCacheValue(coverMap[vinyl.id]);
+    if (parsed.type === "hit") return parsed.url;
+    return vinyl.cover_image_url || "";
   };
 };
 
@@ -350,6 +408,46 @@ const getSessionVinyls = (sessionId, type) =>
     .map((item) => getVinylById(item.vinyl_id))
     .filter(Boolean);
 
+const getThematicSessionPicks = (session, seedVinyls = [], limit = 4, resolveCoverUrl) => {
+  const picks = [];
+  const ids = new Set();
+  const addPick = (vinyl) => {
+    if (!vinyl || ids.has(vinyl.id) || picks.length >= limit) return;
+    ids.add(vinyl.id);
+    picks.push(vinyl);
+  };
+  const hasVisualCover = (vinyl) => hasRealCoverUrl(resolveCoverUrl?.(vinyl));
+  const movementTags = session?.movements || [];
+  const thematicPool = vinyls.filter((vinyl) =>
+    movementTags.some((tag) => vinyl.tags?.includes(tag))
+  );
+  const thematicRealPool = thematicPool.filter(hasVisualCover);
+  const globalRealPool = vinyls.filter(hasVisualCover);
+
+  seedVinyls.filter(hasVisualCover).forEach(addPick);
+  thematicRealPool.forEach(addPick);
+  globalRealPool.forEach(addPick);
+
+  seedVinyls.forEach(addPick);
+  thematicPool.forEach(addPick);
+
+  if (picks.length < limit) {
+    vinyls.forEach(addPick);
+  }
+
+  return picks.slice(0, limit);
+};
+
+const buildCoverBackgroundStyle = (vinyl, resolveCoverUrl) => {
+  const fallbackUrl = vinyl?.cover_image_url || "";
+  const primaryUrl = resolveCoverUrl?.(vinyl) || "";
+  const cssUrl = (value) => `url("${String(value).replace(/"/g, "%22")}")`;
+  if (primaryUrl && fallbackUrl && primaryUrl !== fallbackUrl) {
+    return { backgroundImage: `${cssUrl(primaryUrl)}, ${cssUrl(fallbackUrl)}` };
+  }
+  return { backgroundImage: cssUrl(primaryUrl || fallbackUrl) };
+};
+
 const isVinylInSession = (sessionId, vinylId) =>
   sessionVinyl.some(
     (item) => item.session_id === sessionId && item.vinyl_id === vinylId
@@ -395,9 +493,12 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
 );
 
 const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
-  const covers = getSessionVinyls(session.id, "tocado")
-    .filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)))
-    .slice(0, 4);
+  const covers = getThematicSessionPicks(
+    session,
+    getSessionVinyls(session.id, "tocado"),
+    4,
+    resolveCoverUrl
+  );
   const isSpecial = Boolean(session.is_special && session.guest_name);
   return (
     <div
@@ -439,7 +540,7 @@ const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
             <div
               key={vinyl.id}
               className="session-cover"
-              style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
+              style={buildCoverBackgroundStyle(vinyl, resolveCoverUrl)}
             />
           ))}
         </div>
@@ -707,16 +808,26 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
   const movementDisplay = useMemo(() => {
     if (!movementLabel) return [];
     const exact = vinyls.filter((vinyl) => vinyl.tags?.includes(movementLabel));
-    if (exact.length) return exact.slice(0, 4);
-    return movementBase.slice(0, 4);
-  }, [movementLabel, movementBase]);
-  const movementDisplayWithCover = useMemo(
-    () => movementDisplay.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
-    [movementDisplay, resolveCoverUrl]
-  );
+    const pool = exact.length ? exact : movementBase;
+    const picks = [];
+    const ids = new Set();
+    const addPick = (vinyl) => {
+      if (!vinyl || ids.has(vinyl.id) || picks.length >= 4) return;
+      ids.add(vinyl.id);
+      picks.push(vinyl);
+    };
+    const hasVisualCover = (vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl));
+
+    pool.filter(hasVisualCover).forEach(addPick);
+    pool.forEach(addPick);
+    vinyls.filter(hasVisualCover).forEach(addPick);
+    vinyls.forEach(addPick);
+
+    return picks.slice(0, 4);
+  }, [movementLabel, movementBase, resolveCoverUrl]);
   const movementPackage = useMemo(() => {
-    if (!movementDisplayWithCover.length) return null;
-    const picks = movementDisplayWithCover
+    if (!movementDisplay.length) return null;
+    const picks = movementDisplay
       .map((vinyl) => {
         const best = getBestInventory(vinyl.id);
         if (!best) return null;
@@ -729,7 +840,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
     const totalBase = picks.reduce((sum, item) => sum + item.basePrice, 0);
     const totalPack = Math.round(totalBase * 0.85);
     return { picks, totalBase, totalPack };
-  }, [movementDisplayWithCover, member]);
+  }, [movementDisplay, member]);
 
   const pastSessions = sessions.filter(
     (session) => new Date(session.date) < new Date(today.toDateString())
@@ -911,7 +1022,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
           </div>
         ) : null}
         <div className="vinyl-grid">
-          {(movementLabel ? movementDisplayWithCover : filteredDisplay).map((vinyl) => (
+          {(movementLabel ? movementDisplay : filteredDisplay).map((vinyl) => (
             <VinylCard
               key={vinyl.id}
               vinyl={vinyl}
@@ -951,7 +1062,7 @@ const SessionPage = ({
   }
 
   const played = getSessionVinyls(session.id, "tocado");
-  const playedDisplay = played.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
+  const playedDisplay = getThematicSessionPicks(session, played, 4, resolveCoverUrl);
   const related = getSessionVinyls(session.id, "relacionado");
   const relatedDisplay = (() => {
     const ids = new Set();
@@ -999,13 +1110,12 @@ const SessionPage = ({
       </div>
     </aside>
   );
-  const vinylsWithRealCover = useMemo(
-    () => vinyls.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
-    [resolveCoverUrl]
-  );
   const movementGroups = movementTags.map((tag) => {
-    const primary = vinylsWithRealCover.filter((vinyl) => vinyl.tags?.includes(tag));
+    const primary = vinyls.filter((vinyl) => vinyl.tags?.includes(tag));
+    const primaryReal = primary.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
     const nonPlayed = primary.filter((vinyl) => !played.some((item) => item.id === vinyl.id));
+    const nonPlayedReal = nonPlayed.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
+    const globalReal = vinyls.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
     const items = [];
     const picked = new Set();
     const pushItem = (vinyl) => {
@@ -1014,17 +1124,21 @@ const SessionPage = ({
       items.push(vinyl);
     };
 
-    (nonPlayed.length ? nonPlayed : primary).forEach(pushItem);
+    (nonPlayedReal.length ? nonPlayedReal : primaryReal).forEach(pushItem);
 
     if (items.length < 4) {
-      vinylsWithRealCover.forEach((vinyl) => {
+      globalReal.forEach((vinyl) => {
         if (played.some((item) => item.id === vinyl.id)) return;
         pushItem(vinyl);
       });
     }
 
     if (items.length < 4) {
-      vinylsWithRealCover.forEach(pushItem);
+      (nonPlayed.length ? nonPlayed : primary).forEach(pushItem);
+    }
+
+    if (items.length < 4) {
+      vinyls.forEach(pushItem);
     }
 
     return { tag, items };
@@ -1111,7 +1225,7 @@ const SessionPage = ({
                 <Link to={`/vinyl/${vinyl.id}`}>
                   <div
                     className="played-cover"
-                    style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
+                    style={buildCoverBackgroundStyle(vinyl, resolveCoverUrl)}
                   />
                 </Link>
                 <div className="played-info">
@@ -1211,15 +1325,18 @@ const SessionPage = ({
               <div key={group.tag} className="movement-card">
                 <div className="movement-title">{group.tag}</div>
                 <div className="movement-covers">
-                  {group.items.map((vinyl) => (
-                    <Link key={vinyl.id} to={`/vinyl/${vinyl.id}`} className="movement-cover">
-                      <div
-                        className="movement-cover-image"
-                        style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
-                        aria-label={`${vinyl.artist} ${vinyl.album}`}
-                      />
-                    </Link>
-                  ))}
+                  {(() => {
+                    const movementHref = `/market?catalog=1&movement=${encodeURIComponent(group.tag)}`;
+                    return group.items.map((vinyl) => (
+                      <Link key={vinyl.id} to={movementHref} className="movement-cover">
+                        <div
+                          className="movement-cover-image"
+                          style={buildCoverBackgroundStyle(vinyl, resolveCoverUrl)}
+                          aria-label={`${group.tag} · ${vinyl.artist} ${vinyl.album}`}
+                        />
+                      </Link>
+                    ));
+                  })()}
                   <Link
                     to={`/market?catalog=1&movement=${encodeURIComponent(group.tag)}`}
                     className="movement-overlay"
