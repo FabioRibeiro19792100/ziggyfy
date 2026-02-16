@@ -1,3 +1,6 @@
+import gastaoPhoto from "../Gastao.jpg";
+import lorenaPhoto from "../Lorena.webp";
+
 const coverPalette = [
   ["#1f1c1a", "#7a6a4f"],
   ["#141312", "#3d3a36"],
@@ -2411,6 +2414,7 @@ export const sessions = [
     date: "2026-02-16",
     theme: "Alta Voltagem",
     description: "Recorte de rock e metal com pressão, riffs clássicos e dinâmica de sala cheia.",
+    detail_description: "Noite dedicada a prensagens com dinâmica alta, graves definidos e guitarras na frente da mix. A curadoria percorre clássicos de hard rock e metal em sequência para manter energia contínua do começo ao fim da sessão. O roteiro privilegia discos com ataque e impacto, buscando uma escuta física e direta em volume de sala.",
     movements: [
       "Guitarras de garagem",
       "Peso analogico",
@@ -2422,6 +2426,7 @@ export const sessions = [
     date: "2026-02-18",
     theme: "Noite Urbana",
     description: "Pulso pós-punk e new wave para uma sessão fria, repetitiva e hipnótica.",
+    detail_description: "Seleção com foco em baixo pulsante, repetição hipnótica e timbres secos de bateria e synth. A sessão foi desenhada para uma escuta noturna, com transições entre faixas de atmosfera densa e andamento constante. O recorte valoriza tensão, espaço e textura, mantendo a narrativa urbana sem perder fluidez.",
     movements: [
       "Noite urbana",
       "Sintese fria",
@@ -2433,6 +2438,12 @@ export const sessions = [
     date: "2026-02-20",
     theme: "Brasil em Rotacao",
     description: "Canção brasileira em vinil, entre MPB e BR rock de catálogo.",
+    detail_description: "Recorte de canção brasileira com ênfase em repertório de catálogo, arranjos orgânicos e gravações com forte presença de sala. A noite combina discos de MPB e BR rock para construir uma narrativa de época em rotação contínua. O foco está na letra, no timbre de voz e no desenho harmônico de faixas que marcaram gerações.",
+    is_special: true,
+    guest_name: "Gastão Moreira",
+    guest_role: "Convidado da noite",
+    guest_photo_url: gastaoPhoto,
+    guest_bio: "Jornalista e apresentador, Gastão marcou a cobertura de rock no Brasil com curadoria, entrevistas e programas que conectaram gerações de ouvintes.",
     movements: [
       "Brasilidade eletrica",
       "Cancao de varanda",
@@ -2444,6 +2455,7 @@ export const sessions = [
     date: "2026-02-22",
     theme: "Baladas e Groove",
     description: "Soul e pop com faixas de grande apelo melódico e groove contínuo.",
+    detail_description: "Programa pensado para escuta confortável e envolvente, com baladas, soul e pop de forte identidade melódica. O roteiro mantém groove estável e camadas vocais em destaque, ideal para sessões longas sem quebra de clima. A seleção equilibra canções conhecidas e cortes menos óbvios para ampliar repertório sem quebrar o fluxo.",
     movements: [
       "Baladas de pista",
       "Groove classico",
@@ -2455,6 +2467,7 @@ export const sessions = [
     date: "2026-02-24",
     theme: "Escuta de Referencia",
     description: "Noite dedicada à escuta de detalhes, timbre e espacialidade.",
+    detail_description: "Sessão orientada por qualidade de gravação e recorte técnico: palco estéreo, resposta de médios e microdinâmica. Os discos foram selecionados para demonstrar contraste de mix e textura instrumental em diferentes pressagens. A proposta é comparar caráter sonoro com atenção aos detalhes de ambiência, imagem e profundidade.",
     movements: [
       "Sessao de escuta",
       "Noite instrumental",
@@ -2466,6 +2479,12 @@ export const sessions = [
     date: "2026-02-26",
     theme: "Classicos da Casa",
     description: "Seleção transversal de clássicos para apresentar o acervo completo.",
+    detail_description: "Panorama da identidade sonora do Ziggy, com clássicos de diferentes frentes do acervo em sequência coesa. A proposta é apresentar o repertório da casa com foco em discos que definem assinatura e memória de pista. O percurso combina familiaridade e surpresa para mostrar alcance curatorial sem perder unidade.",
+    is_special: true,
+    guest_name: "Lorena Calabria",
+    guest_role: "Convidada da noite",
+    guest_photo_url: lorenaPhoto,
+    guest_bio: "Jornalista e apresentadora, Lorena atua entre música e cultura pop com um olhar de repertório que aproxima rádio, TV e cena ao vivo.",
     movements: [
       "Classicos de acervo",
       "Sessao principal",
@@ -2477,6 +2496,7 @@ export const sessions = [
     date: "2026-02-28",
     theme: "Lado B Pesado",
     description: "Foco em cortes de impacto e discos de alta energia.",
+    detail_description: "Curadoria de lados B e faixas de maior impacto, com ganho de intensidade ao longo da noite. A seleção prioriza peso, ataque e pressão sonora para manter a sessão em alta rotação até o encerramento. O encadeamento foi pensado para sustentar energia crescente, com viradas marcantes entre blocos.",
     movements: [
       "Peso analogico",
       "Guitarras de garagem",
@@ -2488,6 +2508,7 @@ export const sessions = [
     date: "2026-03-02",
     theme: "Fechamento Ziggy",
     description: "Síntese do mês com repertório de diferentes frentes sonoras do catálogo.",
+    detail_description: "Fechamento de ciclo com síntese das linhas curatoriais do mês, cruzando rock, brasilidade, groove e escuta de referência. A ordem dos discos foi pensada para revisitar destaques e concluir a programação com unidade. A sessão funciona como retrospectiva comentada da casa, conectando os eixos que definiram o período.",
     movements: [
       "Sessao principal",
       "Classicos de acervo",

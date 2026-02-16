@@ -3,13 +3,19 @@ import { inventory, partners, sessions, sessionVinyl, vinyls } from "./data.js";
 import imagemCardapio2 from "../Cardapio2.jpg";
 import capaHero from "../capahero.webp";
 import capaHero4 from "../capa4.webp";
+import capaMock2 from "../Capa2.jpeg";
+import capaMock3 from "../capa3.jpg";
+import capaMock4 from "../Hero8.webp";
 
-const formatDate = (iso) =>
-  new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso));
+const MONTHS_PT = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+const formatDate = (iso) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = MONTHS_PT[date.getMonth()] || "";
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+};
 
 const formatPrice = (value) =>
   new Intl.NumberFormat("pt-BR", {
@@ -17,9 +23,24 @@ const formatPrice = (value) =>
     currency: "BRL",
     maximumFractionDigits: 0,
   }).format(value);
+const splitTextBySentence = (value = "") => {
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  const parts = normalized.match(/[^.!?]+[.!?]?/g);
+  return (parts || [normalized]).map((item) => item.trim()).filter(Boolean);
+};
+const getInitials = (value = "") =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
 
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
 const COVER_CACHE_KEY = "ziggy_real_cover_cache_v2";
+const STABLE_MOCK_COVERS = false;
+const STABLE_COVER_POOL = [capaHero, capaHero4, imagemCardapio2, capaMock2, capaMock3, capaMock4];
 
 const normalizeCoverText = (value = "") =>
   value
@@ -48,6 +69,13 @@ const getArtworkFromItunesResult = (result) => {
 };
 
 const isGeneratedCover = (url = "") => url.startsWith("data:image/svg+xml");
+const hasRealCoverUrl = (url = "") => Boolean(url) && !isGeneratedCover(url);
+const getStableMockCover = (vinyl) => {
+  if (!vinyl) return STABLE_COVER_POOL[0];
+  if (vinyl.cover_image_url && !isGeneratedCover(vinyl.cover_image_url)) return vinyl.cover_image_url;
+  const numericId = Number(String(vinyl.id ?? "").replace(/\D/g, "")) || 0;
+  return STABLE_COVER_POOL[numericId % STABLE_COVER_POOL.length];
+};
 
 const rankItunesResult = (result, artist, album) => {
   const artistNorm = normalizeCoverText(getPrimaryArtist(artist));
@@ -78,6 +106,10 @@ const isTrustedItunesMatch = (result, artist, album) => {
 };
 
 const useRealCoverResolver = () => {
+  if (STABLE_MOCK_COVERS) {
+    return (vinyl) => getStableMockCover(vinyl);
+  }
+
   const [coverMap, setCoverMap] = useState(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -378,10 +410,13 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
 );
 
 const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
-  const covers = getSessionVinyls(session.id, "tocado").slice(0, 4);
+  const covers = getSessionVinyls(session.id, "tocado")
+    .filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)))
+    .slice(0, 4);
+  const isSpecial = Boolean(session.is_special && session.guest_name);
   return (
     <div
-      className="session-card"
+      className={`session-card ${isSpecial ? "is-special" : ""}`}
       onClick={(event) => {
         if (event.target.closest(".session-actions")) return;
         event.preventDefault();
@@ -389,26 +424,48 @@ const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
       }}
     >
       <div className="session-card-header">
-        <div className="session-date">{formatDate(session.date)}</div>
+        <div className="session-card-topline">
+          <div className="session-date">{formatDate(session.date)}</div>
+          {isSpecial ? (
+            <div className="session-special-pill session-special-pill-compact">Sessão especial</div>
+          ) : null}
+        </div>
         <div className="session-theme">{session.theme}</div>
+        <div className="session-card-guest-slot">
+          {isSpecial ? (
+            <div className="session-guest-line">
+              <span>
+                {(session.guest_role || "Convidado da noite")
+                  .replace(" da noite", "")
+                  .replace(" da Noite", "")}
+              </span>
+              <span className="session-guest-separator" aria-hidden="true" />
+              <span>{session.guest_name}</span>
+            </div>
+          ) : (
+            <span aria-hidden="true">placeholder</span>
+          )}
+        </div>
       </div>
       <p className="session-desc">{session.description}</p>
-      <div className="session-covers">
-        {covers.map((vinyl) => (
-          <div
-            key={vinyl.id}
-            className="session-cover"
-            style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
-          />
-        ))}
-      </div>
+      {covers.length ? (
+        <div className="session-covers">
+          {covers.map((vinyl) => (
+            <div
+              key={vinyl.id}
+              className="session-cover"
+              style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className="session-actions">
         <button
           type="button"
           className="reserve-button"
           onClick={() => onReserve(session)}
         >
-          Reservar lugar
+          Reservar
         </button>
         <Link to={`/session/${session.id}`} className="session-buy-link">
           Saber mais
@@ -436,14 +493,14 @@ const SalaPage = ({ onReserve, resolveCoverUrl }) => {
         />
         <a
           className="sala-hero-address sala-hero-address-top"
-          href="https://www.google.com/maps/search/?api=1&query=Avenida%20S%C3%A3o%20Luiz%2C%20222%2C%20conjunto%2018%2C%20S%C3%A3o%20Paulo"
+          href="https://www.google.com/maps/search/?api=1&query=Rua%20da%20Consola%C3%A7%C3%A3o%2C%20222%2C%20conjunto%2018%2C%20S%C3%A3o%20Paulo"
           target="_blank"
           rel="noopener noreferrer"
           title="Abrir no mapa"
-          aria-label="Abrir no mapa: Avenida São Luiz, 222, conjunto 18"
+          aria-label="Abrir no mapa: Rua da Consolação, 222, conjunto 18"
         >
           <span className="sala-hero-address-text">
-            <span className="sala-hero-address-line">Avenida São Luiz, 222</span>
+            <span className="sala-hero-address-line">Rua da Consolação, 222</span>
             <span className="sala-hero-address-line">Conjunto 18</span>
             <span className="sala-hero-address-line">Centro-SP</span>
           </span>
@@ -608,6 +665,10 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
     });
     return picks.length ? picks : vinyls.slice(0, 4);
   }, [upcomingSessions]);
+  const highlightDisplay = useMemo(
+    () => highlightVinyls.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
+    [highlightVinyls, resolveCoverUrl]
+  );
 
   const [query, setQuery] = useState(movementParam);
   const [catalogFilter, setCatalogFilter] = useState("all");
@@ -644,6 +705,10 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
     if (catalogFilter === "90s") return vinyl.year >= 1990 && vinyl.year < 2000;
     return true;
   });
+  const filteredDisplay = useMemo(
+    () => filtered.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
+    [filtered, resolveCoverUrl]
+  );
   const movementBase = useMemo(() => {
     if (!movementLabel) return [];
     const term = movementLabel.toLowerCase();
@@ -659,9 +724,13 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
     if (exact.length) return exact.slice(0, 4);
     return movementBase.slice(0, 4);
   }, [movementLabel, movementBase]);
+  const movementDisplayWithCover = useMemo(
+    () => movementDisplay.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
+    [movementDisplay, resolveCoverUrl]
+  );
   const movementPackage = useMemo(() => {
-    if (!movementDisplay.length) return null;
-    const picks = movementDisplay
+    if (!movementDisplayWithCover.length) return null;
+    const picks = movementDisplayWithCover
       .map((vinyl) => {
         const best = getBestInventory(vinyl.id);
         if (!best) return null;
@@ -674,7 +743,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
     const totalBase = picks.reduce((sum, item) => sum + item.basePrice, 0);
     const totalPack = Math.round(totalBase * 0.85);
     return { picks, totalBase, totalPack };
-  }, [movementDisplay, member]);
+  }, [movementDisplayWithCover, member]);
 
   const pastSessions = sessions.filter(
     (session) => new Date(session.date) < new Date(today.toDateString())
@@ -710,7 +779,7 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
             <p>Discos que ja passaram pelo Ziggy Play em sessões anteriores.</p>
           </div>
           <div className="vinyl-highlight">
-            {highlightVinyls.map((vinyl) => (
+            {highlightDisplay.map((vinyl) => (
               <div key={vinyl.id} className="highlight-item">
                 <div
                   className="highlight-cover"
@@ -852,11 +921,11 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <span className="result-count">{filtered.length} itens</span>
+            <span className="result-count">{filteredDisplay.length} itens</span>
           </div>
         ) : null}
         <div className="vinyl-grid">
-          {(movementLabel ? movementDisplay : filtered).map((vinyl) => (
+          {(movementLabel ? movementDisplayWithCover : filteredDisplay).map((vinyl) => (
             <VinylCard
               key={vinyl.id}
               vinyl={vinyl}
@@ -889,6 +958,7 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolve
   }
 
   const played = getSessionVinyls(session.id, "tocado");
+  const playedDisplay = played.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)));
   const related = getSessionVinyls(session.id, "relacionado");
   const relatedDisplay = (() => {
     const ids = new Set();
@@ -910,39 +980,115 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolve
       });
     }
 
-    return list.slice(0, 4);
+    return list
+      .filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl)))
+      .slice(0, 4);
   })();
   const movementTags = session?.movements || [];
+  const isSpecial = Boolean(session?.is_special && session?.guest_name);
+  const guestPhotoUrl = session?.guest_photo_url || "";
+  const guestInitials = getInitials(session?.guest_name || "Convidado");
+  const guestBio = session?.guest_bio || "";
+  const sessionLongDescription = session?.detail_description || session?.description || "";
+  const vinylsWithRealCover = useMemo(
+    () => vinyls.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
+    [resolveCoverUrl]
+  );
   const movementGroups = movementTags.map((tag) => {
-    const primary = vinyls.filter((vinyl) => vinyl.tags?.includes(tag));
+    const primary = vinylsWithRealCover.filter((vinyl) => vinyl.tags?.includes(tag));
     const nonPlayed = primary.filter((vinyl) => !played.some((item) => item.id === vinyl.id));
-    const items = (nonPlayed.length ? nonPlayed : primary).slice(0, 4);
+    const items = [];
+    const picked = new Set();
+    const pushItem = (vinyl) => {
+      if (!vinyl || picked.has(vinyl.id) || items.length >= 4) return;
+      picked.add(vinyl.id);
+      items.push(vinyl);
+    };
+
+    (nonPlayed.length ? nonPlayed : primary).forEach(pushItem);
+
+    if (items.length < 4) {
+      vinylsWithRealCover.forEach((vinyl) => {
+        if (played.some((item) => item.id === vinyl.id)) return;
+        pushItem(vinyl);
+      });
+    }
+
+    if (items.length < 4) {
+      vinylsWithRealCover.forEach(pushItem);
+    }
+
     return { tag, items };
-  }).filter((group) => group.items.length > 0);
+  }).filter((group) => group.items.length === 4);
 
   return (
     <main className="page">
       <section className="section">
-        <div className="breadcrumb">
-          <Link to="/">Home</Link>
-          <span>→</span>
-          <span>Sessao</span>
-        </div>
-        <div className="session-hero">
-          <div>
-            <div className="session-date">{formatDate(session.date)}</div>
-            <h1>{session.theme}</h1>
-            <p>{session.description}</p>
+        {isSpecial ? (
+          <div className="session-hero session-hero--special">
+            <div className="session-night-feature">
+              <div className="session-date">{formatDate(session.date)}</div>
+              <h1>{session.theme}</h1>
+              {sessionLongDescription ? (
+                <div className="session-body-copy-group">
+                  {splitTextBySentence(sessionLongDescription).map((line, index) => (
+                    <p key={`${line}-${index}`} className="session-long-description session-body-copy">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="session-guest-photo">
+              {guestPhotoUrl ? (
+                <img src={guestPhotoUrl} alt={session.guest_name} />
+              ) : (
+                <div className="session-guest-feature-fallback" aria-hidden="true">
+                  {guestInitials}
+                </div>
+              )}
+            </div>
+            <aside className="session-guest-bio-card">
+              <div className="meta-label">Convidado Especial</div>
+              <div className="session-guest-name">{session.guest_name}</div>
+              <div className="session-guest-role">{session.guest_role || "Convidado da noite"}</div>
+              {guestBio ? (
+                <div className="session-body-copy-group">
+                  {splitTextBySentence(guestBio).map((line, index) => (
+                    <p key={`${line}-${index}`} className="session-guest-bio session-body-copy">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </aside>
           </div>
-        </div>
+        ) : (
+          <div className="session-hero">
+            <div className="session-hero-main">
+              <div className="session-date">{formatDate(session.date)}</div>
+              <h1>{session.theme}</h1>
+              {sessionLongDescription ? (
+                <div className="session-body-copy-group">
+                  {splitTextBySentence(sessionLongDescription).map((line, index) => (
+                    <p key={`${line}-${index}`} className="session-long-description session-body-copy">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="section">
         <div className="section-header">
           <h2>Seleção principal da noite</h2>
+          <div className="session-time-pill">Primeiro álbum às 20:30</div>
         </div>
         <div className="played-grid">
-          {played.map((vinyl) => {
+          {playedDisplay.map((vinyl) => {
             const best = getBestInventory(vinyl.id);
             const partner = best ? getPartnerById(best.partner_id) : null;
             return (
@@ -1101,8 +1247,23 @@ const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember, resolveCove
   }
 
   const items = getInventoryForVinyl(vinyl.id);
+  const vinylCoverUrl = resolveCoverUrl(vinyl);
+  if (!hasRealCoverUrl(vinylCoverUrl)) {
+    return (
+      <main className="page">
+        <div className="section-header">
+          <h2>Disco sem capa real no acervo visual</h2>
+          <p>Este item foi ocultado por não ter capa oficial disponível.</p>
+          <Link to="/market?catalog=1" className="primary-link">
+            Voltar ao catálogo
+          </Link>
+        </div>
+      </main>
+    );
+  }
   const related = vinyls
     .filter((item) => item.genre === vinyl.genre && item.id !== vinyl.id)
+    .filter((item) => hasRealCoverUrl(resolveCoverUrl(item)))
     .slice(0, 3);
 
   return (
@@ -1111,7 +1272,7 @@ const VinylPage = ({ vinylId, member, onAddToCart, onActivateMember, resolveCove
         <div className="vinyl-hero">
           <div
             className="vinyl-hero-cover"
-            style={{ backgroundImage: `url(${resolveCoverUrl(vinyl)})` }}
+            style={{ backgroundImage: `url(${vinylCoverUrl})` }}
           />
           <div className="vinyl-hero-info">
             <div className="vinyl-artist">{vinyl.artist}</div>
@@ -2120,7 +2281,7 @@ const App = () => {
       <footer className="footer">
         <div className="footer-main">
           <div className="footer-brand">Ziggy Play</div>
-          <div className="footer-address">Avenida São Luiz, 222, conjunto 18, Centro, São Paulo/SP</div>
+          <div className="footer-address">Rua da Consolação, 222, conjunto 18, Centro, São Paulo/SP</div>
         </div>
         <div className="footer-quote">we are absolute beginners</div>
       </footer>
