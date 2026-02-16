@@ -2020,7 +2020,7 @@ a {
   grid-area: night;
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
   padding-right: 18px;
 }
@@ -2028,6 +2028,83 @@ a {
 .session-long-description {
   margin: 0;
   max-width: 720px;
+}
+
+.session-hero-copy-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.session-description-block {
+  min-width: 0;
+  padding-right: 6px;
+}
+
+.session-quick-card {
+  border-left: 1px solid rgba(236, 210, 150, 0.24);
+  background: transparent;
+  width: 100%;
+  max-width: 270px;
+  margin-top: 8px;
+  padding: 6px 0 4px 12px;
+  display: grid;
+  gap: 3px;
+}
+
+.session-quick-card .meta-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(241, 239, 234, 0.34);
+}
+
+.session-quick-links {
+  display: grid;
+  gap: 0;
+}
+
+.session-cta-link {
+  width: 100%;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  color: rgba(241, 239, 234, 0.52);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 400;
+  font-family: inherit;
+  line-height: 1.2;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(236, 210, 150, 0.16);
+  cursor: pointer;
+}
+
+.session-cta-link::after {
+  content: "↗";
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(232, 188, 101, 0.4);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.session-cta-link:last-child {
+  border-bottom: 0;
+}
+
+.session-cta-link:hover {
+  color: rgba(241, 239, 234, 0.82);
+}
+
+.session-cta-link:hover::after {
+  transform: translate(2px, -2px);
+  color: rgba(241, 239, 234, 0.72);
 }
 
 .session-meta {
@@ -4111,6 +4188,10 @@ a {
 }
 
 @media (max-width: 900px) {
+  .session-hero {
+    gap: 28px;
+  }
+
   .sala-hero-copy {
     bottom: 64px !important;
     min-height: auto !important;
@@ -4121,9 +4202,32 @@ a {
     grid-template-columns: 1fr;
     grid-template-areas:
       "night"
-      "photo"
-      "bio";
-    gap: 14px;
+      "bio"
+      "photo";
+    gap: 22px;
+  }
+
+  .session-hero-copy-row {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .session-night-feature {
+    padding-right: 0;
+    gap: 10px;
+  }
+
+  .session-description-block {
+    padding-right: 0;
+  }
+
+  .session-quick-card {
+    width: 100vw;
+    max-width: none;
+    margin-top: 4px;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding: 8px 16px 6px;
   }
 
   .session-guest-feature {
@@ -4134,6 +4238,14 @@ a {
   .session-guest-photo,
   .session-guest-bio-card {
     min-height: 0;
+  }
+
+  .session-guest-bio-card {
+    background: transparent;
+    padding: 0;
+    gap: 12px;
+    border: 0;
+    box-shadow: none;
   }
 
   .session-guest-photo img,
@@ -4153,14 +4265,14 @@ a {
   }
 
   .session-body-copy {
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.58;
   }
 
   .session-hero .session-long-description,
   .session-hero .session-guest-bio {
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.58;
   }
 
   .sala-hero-address-top {

@@ -3,9 +3,6 @@ import { inventory, partners, sessions, sessionVinyl, vinyls } from "./data.js";
 import imagemCardapio2 from "../Cardapio2.jpg";
 import capaHero from "../capahero.webp";
 import capaHero4 from "../capa4.webp";
-import capaMock2 from "../Capa2.jpeg";
-import capaMock3 from "../capa3.jpg";
-import capaMock4 from "../Hero8.webp";
 
 const MONTHS_PT = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 const formatDate = (iso) => {
@@ -39,8 +36,6 @@ const getInitials = (value = "") =>
 
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
 const COVER_CACHE_KEY = "ziggy_real_cover_cache_v2";
-const STABLE_MOCK_COVERS = false;
-const STABLE_COVER_POOL = [capaHero, capaHero4, imagemCardapio2, capaMock2, capaMock3, capaMock4];
 
 const normalizeCoverText = (value = "") =>
   value
@@ -70,12 +65,6 @@ const getArtworkFromItunesResult = (result) => {
 
 const isGeneratedCover = (url = "") => url.startsWith("data:image/svg+xml");
 const hasRealCoverUrl = (url = "") => Boolean(url) && !isGeneratedCover(url);
-const getStableMockCover = (vinyl) => {
-  if (!vinyl) return STABLE_COVER_POOL[0];
-  if (vinyl.cover_image_url && !isGeneratedCover(vinyl.cover_image_url)) return vinyl.cover_image_url;
-  const numericId = Number(String(vinyl.id ?? "").replace(/\D/g, "")) || 0;
-  return STABLE_COVER_POOL[numericId % STABLE_COVER_POOL.length];
-};
 
 const rankItunesResult = (result, artist, album) => {
   const artistNorm = normalizeCoverText(getPrimaryArtist(artist));
@@ -106,10 +95,6 @@ const isTrustedItunesMatch = (result, artist, album) => {
 };
 
 const useRealCoverResolver = () => {
-  if (STABLE_MOCK_COVERS) {
-    return (vinyl) => getStableMockCover(vinyl);
-  }
-
   const [coverMap, setCoverMap] = useState(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -589,6 +574,7 @@ const VinylCard = ({ vinyl, subtitle, member, onAddToCart, inventoryItem, onActi
                   const to = partnerCatalogLink(partner.id);
                   window.history.pushState({}, "", to);
                   window.dispatchEvent(new PopStateEvent("popstate"));
+                  window.scrollTo(0, 0);
                 }}
               >
                 {partner.name}
@@ -942,7 +928,14 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
   );
 };
 
-const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolveCoverUrl }) => {
+const SessionPage = ({
+  sessionId,
+  member,
+  onAddToCart,
+  onActivateMember,
+  resolveCoverUrl,
+  onReserve,
+}) => {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) {
     return (
@@ -990,6 +983,22 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolve
   const guestInitials = getInitials(session?.guest_name || "Convidado");
   const guestBio = session?.guest_bio || "";
   const sessionLongDescription = session?.detail_description || session?.description || "";
+  const sessionActionCard = (
+    <aside className="session-quick-card" aria-label="Ações da sessão">
+      <div className="meta-label">Acesso rápido</div>
+      <div className="session-quick-links">
+        <button type="button" className="session-cta-link" onClick={() => onReserve(session)}>
+          Reservar
+        </button>
+        <Link to="/clube" className="session-cta-link">
+          Tornar-se membro
+        </Link>
+        <Link to="/menu" className="session-cta-link">
+          Ver cardápio
+        </Link>
+      </div>
+    </aside>
+  );
   const vinylsWithRealCover = useMemo(
     () => vinyls.filter((vinyl) => hasRealCoverUrl(resolveCoverUrl(vinyl))),
     [resolveCoverUrl]
@@ -1029,15 +1038,18 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolve
             <div className="session-night-feature">
               <div className="session-date">{formatDate(session.date)}</div>
               <h1>{session.theme}</h1>
-              {sessionLongDescription ? (
-                <div className="session-body-copy-group">
-                  {splitTextBySentence(sessionLongDescription).map((line, index) => (
-                    <p key={`${line}-${index}`} className="session-long-description session-body-copy">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
+              <div className="session-hero-copy-row">
+                {sessionLongDescription ? (
+                  <div className="session-description-block session-body-copy-group">
+                    {splitTextBySentence(sessionLongDescription).map((line, index) => (
+                      <p key={`${line}-${index}`} className="session-long-description session-body-copy">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                {sessionActionCard}
+              </div>
             </div>
             <div className="session-guest-photo">
               {guestPhotoUrl ? (
@@ -1068,15 +1080,18 @@ const SessionPage = ({ sessionId, member, onAddToCart, onActivateMember, resolve
             <div className="session-hero-main">
               <div className="session-date">{formatDate(session.date)}</div>
               <h1>{session.theme}</h1>
-              {sessionLongDescription ? (
-                <div className="session-body-copy-group">
-                  {splitTextBySentence(sessionLongDescription).map((line, index) => (
-                    <p key={`${line}-${index}`} className="session-long-description session-body-copy">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
+              <div className="session-hero-copy-row">
+                {sessionLongDescription ? (
+                  <div className="session-description-block session-body-copy-group">
+                    {splitTextBySentence(sessionLongDescription).map((line, index) => (
+                      <p key={`${line}-${index}`} className="session-long-description session-body-copy">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                {sessionActionCard}
+              </div>
             </div>
           </div>
         )}
@@ -2239,6 +2254,11 @@ const App = () => {
           onAddToCart={requestAddToCart}
           onActivateMember={() => setMember(true)}
           resolveCoverUrl={resolveCoverUrl}
+          onReserve={(session) => {
+            setReserveSession(session);
+            setReserveSuccess(false);
+            setReserveOpen(true);
+          }}
         />
       )}
       {route.name === "vinyl" && (
