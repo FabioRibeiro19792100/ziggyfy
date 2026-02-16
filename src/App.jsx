@@ -36,6 +36,16 @@ const getInitials = (value = "") =>
     .join("");
 
 const discountedPrice = (normalPrice) => Math.round(normalPrice * 0.85);
+const CATALOG_FILTER_OPTIONS = [
+  { id: "all", label: "Todos" },
+  { id: "discount", label: "Com desconto" },
+  { id: "rarity", label: "Raridades" },
+  { id: "up100", label: "Ate R$ 100" },
+  { id: "up200", label: "Ate R$ 200" },
+  { id: "70s", label: "Anos 70" },
+  { id: "80s", label: "Anos 80" },
+  { id: "90s", label: "Anos 90" },
+];
 const COVER_CACHE_KEY = "ziggy_real_cover_cache_v3";
 const COVER_MISS_PREFIX = "__MISS__:";
 const COVER_MISS_RETRY_MS = 1000 * 60 * 60 * 6;
@@ -499,6 +509,21 @@ const TopNav = ({ member, setMember, cartCount, onToggleCart }) => (
   </header>
 );
 
+const CatalogFilters = ({ activeFilter, onChange }) => (
+  <div className="catalog-filters">
+    {CATALOG_FILTER_OPTIONS.map((option) => (
+      <button
+        key={option.id}
+        type="button"
+        className={`filter-chip ${activeFilter === option.id ? "is-active" : ""}`}
+        onClick={() => onChange(option.id)}
+      >
+        {option.label}
+      </button>
+    ))}
+  </div>
+);
+
 const SessionCard = ({ session, onReserve, resolveCoverUrl }) => {
   const covers = getThematicSessionPicks(
     session,
@@ -958,74 +983,17 @@ const MarketplacePage = ({ member, onReserve, onAddToCart, onAddPackToCart, onAc
           </div>
         ) : null}
         {!movementLabel ? (
-          <div className="catalog-filters">
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "all" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("all")}
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "discount" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("discount")}
-            >
-              Com desconto
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "rarity" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("rarity")}
-            >
-              Raridades
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "up100" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("up100")}
-            >
-              Ate R$ 100
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "up200" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("up200")}
-            >
-              Ate R$ 200
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "70s" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("70s")}
-            >
-              Anos 70
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "80s" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("80s")}
-            >
-              Anos 80
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${catalogFilter === "90s" ? "is-active" : ""}`}
-              onClick={() => setCatalogFilter("90s")}
-            >
-              Anos 90
-            </button>
-          </div>
-        ) : null}
-        {!movementLabel ? (
-          <div className="search-row">
-            <input
-              type="search"
-              placeholder="Digite artista ou album"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <span className="result-count">{filteredDisplay.length} itens</span>
+          <div className="catalog-controls-bar">
+            <CatalogFilters activeFilter={catalogFilter} onChange={setCatalogFilter} />
+            <div className="search-row">
+              <input
+                type="search"
+                placeholder="Digite artista ou album"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <span className="result-count">{filteredDisplay.length} itens</span>
+            </div>
           </div>
         ) : null}
         <div className="vinyl-grid">
@@ -1627,14 +1595,48 @@ const PartnersPage = () => {
 
 const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember, resolveCoverUrl }) => {
   const partner = getPartnerById(partnerId);
-  const partnerItems = inventory.filter((item) => item.partner_id === partnerId);
-  const partnerVinyls = partnerItems
-    .map((item) => {
-      const vinyl = getVinylById(item.vinyl_id);
-      if (!vinyl) return null;
-      return { vinyl, inventory: item };
-    })
-    .filter(Boolean);
+  const partnerItems = useMemo(() => inventory.filter((item) => item.partner_id === partnerId), [partnerId]);
+  const partnerVinyls = useMemo(
+    () =>
+      partnerItems
+        .map((item) => {
+          const vinyl = getVinylById(item.vinyl_id);
+          if (!vinyl) return null;
+          return { vinyl, inventory: item };
+        })
+        .filter(Boolean),
+    [partnerItems]
+  );
+  const [query, setQuery] = useState("");
+  const [catalogFilter, setCatalogFilter] = useState("all");
+  const discountVinylIds = useMemo(
+    () => new Set(partnerItems.filter((item) => item.price_member < item.price_normal).map((item) => item.vinyl_id)),
+    [partnerItems]
+  );
+  const rarityVinylIds = useMemo(
+    () => new Set(partnerItems.filter((item) => item.quantity <= 1).map((item) => item.vinyl_id)),
+    [partnerItems]
+  );
+  const filteredPartnerVinyls = useMemo(
+    () =>
+      partnerVinyls.filter((item) => {
+        const term = `${item.vinyl.artist} ${item.vinyl.album} ${item.vinyl.genre} ${(item.vinyl.tags || []).join(" ")}`
+          .toLowerCase();
+        const matchQuery = term.includes(query.toLowerCase());
+        if (!matchQuery) return false;
+        const activePrice = member ? discountedPrice(item.inventory.price_normal) : item.inventory.price_normal;
+        if (catalogFilter === "all") return true;
+        if (catalogFilter === "discount") return discountVinylIds.has(item.vinyl.id);
+        if (catalogFilter === "rarity") return rarityVinylIds.has(item.vinyl.id);
+        if (catalogFilter === "up100") return activePrice <= 100;
+        if (catalogFilter === "up200") return activePrice <= 200;
+        if (catalogFilter === "70s") return item.vinyl.year >= 1970 && item.vinyl.year < 1980;
+        if (catalogFilter === "80s") return item.vinyl.year >= 1980 && item.vinyl.year < 1990;
+        if (catalogFilter === "90s") return item.vinyl.year >= 1990 && item.vinyl.year < 2000;
+        return true;
+      }),
+    [partnerVinyls, query, catalogFilter, member, discountVinylIds, rarityVinylIds]
+  );
 
   if (!partner) {
     return (
@@ -1651,14 +1653,28 @@ const PartnerPage = ({ partnerId, onAddToCart, member, onActivateMember, resolve
 
   return (
     <main className="page">
-      <section className="section">
-        <div className="section-header">
-          <h2>{partner.name}</h2>
-          <p>{partner.description}</p>
+      <section className="section partner-page-section">
+        <div className="partner-sticky-stack">
+          <div className="section-header">
+            <h2>{partner.name}</h2>
+            <p>{partner.description}</p>
+          </div>
+          <div className="partner-address">{partner.address}</div>
+          <div className="catalog-controls-bar partner-catalog-controls">
+            <CatalogFilters activeFilter={catalogFilter} onChange={setCatalogFilter} />
+            <div className="search-row">
+              <input
+                type="search"
+                placeholder="Digite artista ou album"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <span className="result-count">{filteredPartnerVinyls.length} itens</span>
+            </div>
+          </div>
         </div>
-        <div className="partner-address">{partner.address}</div>
         <div className="vinyl-grid">
-          {partnerVinyls.map((item) => (
+          {filteredPartnerVinyls.map((item) => (
             <VinylCard
               key={item.vinyl.id}
               vinyl={item.vinyl}
@@ -2127,6 +2143,21 @@ const App = () => {
     if (cleanPath === "/partners") return { name: "partners" };
     return { name: "notfound" };
   }, [path]);
+
+  useEffect(() => {
+    const syncTopNavHeight = () => {
+      const topNav = document.querySelector(".top-nav");
+      const height = topNav ? Math.ceil(topNav.getBoundingClientRect().height) : 0;
+      document.documentElement.style.setProperty("--top-nav-height", `${height}px`);
+    };
+    syncTopNavHeight();
+    const frame = window.requestAnimationFrame(syncTopNavHeight);
+    window.addEventListener("resize", syncTopNavHeight);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", syncTopNavHeight);
+    };
+  }, [route.name]);
 
   return (
     <div className="app">
